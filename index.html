@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HawkVision Admin Center</title>
+
+  <title>HawkVision 管理中心</title>
 
   <style>
     * {
@@ -18,23 +19,22 @@
     }
 
     header {
-      background: #111827;
+      background: linear-gradient(90deg, #111827, #172554);
       color: white;
-      padding: 20px 24px;
+      padding: 22px 32px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
+      gap: 20px;
     }
 
-    .brand h1 {
+    header h1 {
       margin: 0;
-      font-size: 24px;
+      font-size: 26px;
     }
 
-    .brand p {
-      margin: 6px 0 0;
+    header p {
+      margin: 7px 0 0;
       color: #cbd5e1;
       font-size: 14px;
     }
@@ -42,146 +42,515 @@
     .version {
       background: #2563eb;
       color: white;
-      padding: 8px 14px;
+      padding: 9px 16px;
       border-radius: 999px;
-      font-weight: 700;
       font-size: 14px;
+      white-space: nowrap;
     }
 
     main {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px;
+      max-width: 1180px;
+      margin: 28px auto;
+      padding: 0 20px 50px;
     }
 
     .notice {
       background: white;
       border-left: 5px solid #2563eb;
-      border-radius: 10px;
-      padding: 18px;
+      border-radius: 12px;
+      padding: 18px 20px;
       margin-bottom: 24px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.05);
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .login-card,
+    .section {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.06);
+    }
+
+    .login-card {
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin: 15px 0 7px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .primary {
+      background: #2563eb;
+      color: white;
+      width: 100%;
+      margin-top: 18px;
+    }
+
+    .logout {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .top-user {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 22px;
     }
 
     .cards {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(4, 1fr);
       gap: 16px;
+      margin-bottom: 24px;
     }
 
     .card {
       background: white;
       border-radius: 14px;
-      padding: 20px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+      padding: 22px;
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.06);
     }
 
     .card .label {
+      color: #64748b;
       font-size: 14px;
-      color: #6b7280;
+      margin-bottom: 12px;
     }
 
     .card .value {
-      margin-top: 10px;
-      font-size: 30px;
-      font-weight: 800;
-    }
-
-    .section {
-      margin-top: 28px;
-      background: white;
-      border-radius: 14px;
-      padding: 20px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.06);
-    }
-
-    .section h2 {
-      margin-top: 0;
-      font-size: 20px;
+      font-size: 31px;
+      font-weight: 700;
     }
 
     .placeholder {
-      padding: 28px;
-      border: 2px dashed #cbd5e1;
+      border: 1px dashed #cbd5e1;
       border-radius: 12px;
+      padding: 28px;
       text-align: center;
       color: #64748b;
     }
 
-    footer {
-      text-align: center;
-      color: #94a3b8;
-      padding: 30px 20px;
-      font-size: 13px;
+    .error {
+      margin-top: 15px;
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 12px;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .loading {
+      color: #64748b;
+      margin-top: 12px;
+      display: none;
+    }
+
+    #dashboard {
+      display: none;
+    }
+
+    @media (max-width: 850px) {
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      header {
+        padding: 18px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .top-user {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
     }
   </style>
 </head>
 
 <body>
 
-<header>
-  <div class="brand">
-    <h1>HawkVision 管理中心</h1>
-    <p>平台帳號、層級、額度與權限管理</p>
-  </div>
-
-  <div class="version">
-    Admin Center v1.0.0
-  </div>
-</header>
-
-<main>
-
-  <div class="notice">
-    <strong>管理中心建置中</strong><br>
-    目前先建立後台首頁與版本識別，下一階段會接入 Supabase 即時資料。
-  </div>
-
-  <div class="cards">
-
-    <div class="card">
-      <div class="label">平台帳號上限</div>
-      <div class="value">100,000</div>
+  <header>
+    <div>
+      <h1>HawkVision 管理中心</h1>
+      <p>平台帳號、層級、額度與權限管理</p>
     </div>
 
-    <div class="card">
-      <div class="label">目前帳號數</div>
-      <div class="value">—</div>
+    <div class="version">
+      Admin Center v1.1.0
+    </div>
+  </header>
+
+  <main>
+
+    <div class="notice">
+      <strong>管理中心已連接 Supabase</strong><br />
+      僅平台最高管理員可以讀取平台總覽資料。
     </div>
 
-    <div class="card">
-      <div class="label">已分配額度</div>
-      <div class="value">—</div>
-    </div>
+    <section id="loginSection" class="login-card">
+      <h2>管理員登入</h2>
 
-    <div class="card">
-      <div class="label">可分配額度</div>
-      <div class="value">—</div>
-    </div>
+      <label for="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        autocomplete="username"
+        placeholder="請輸入管理員 Email"
+      />
 
-  </div>
+      <label for="password">密碼</label>
+      <input
+        id="password"
+        type="password"
+        autocomplete="current-password"
+        placeholder="請輸入密碼"
+      />
 
-  <div class="section">
-    <h2>帳號與層級管理</h2>
+      <button id="loginBtn" class="primary">
+        登入管理中心
+      </button>
 
-    <div class="placeholder">
-      下一階段將顯示：共同管理員、股東、總代理、代理、子代理、會員。
-    </div>
-  </div>
+      <div id="loginLoading" class="loading">
+        正在登入…
+      </div>
 
-  <div class="section">
-    <h2>額度管理</h2>
+      <div id="loginError" class="error"></div>
+    </section>
 
-    <div class="placeholder">
-      下一階段將接入分配額度、收回未使用額度、已使用額度保護。
-    </div>
-  </div>
+    <section id="dashboard">
 
-</main>
+      <div class="section top-user">
+        <div>
+          <strong>目前登入：</strong>
+          <span id="currentUser">—</span>
+        </div>
 
-<footer>
-  HawkVision Admin Center · v1.0.0
-</footer>
+        <button id="logoutBtn" class="logout">
+          登出
+        </button>
+      </div>
+
+      <div class="cards">
+
+        <div class="card">
+          <div class="label">平台帳號上限</div>
+          <div id="platformMax" class="value">—</div>
+        </div>
+
+        <div class="card">
+          <div class="label">目前帳號數</div>
+          <div id="currentAccounts" class="value">—</div>
+        </div>
+
+        <div class="card">
+          <div class="label">已分配額度</div>
+          <div id="allocatedQuota" class="value">—</div>
+        </div>
+
+        <div class="card">
+          <div class="label">可分配額度</div>
+          <div id="availableQuota" class="value">—</div>
+        </div>
+
+      </div>
+
+      <div id="dashboardError" class="error"></div>
+
+      <div class="section">
+        <h2>帳號與層級管理</h2>
+
+        <div class="placeholder">
+          下一階段接入：共同管理員、股東、總代理、代理、子代理、會員。
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>額度管理</h2>
+
+        <div class="placeholder">
+          下一階段接入：分配額度、收回未使用額度、已使用額度保護。
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    const SUPABASE_URL =
+      "https://rwxujvpakpemiwkitltk.supabase.co";
+
+    const SUPABASE_PUBLISHABLE_KEY =
+      "sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
+
+    const supabaseClient =
+      supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY
+      );
+
+    const loginSection =
+      document.getElementById("loginSection");
+
+    const dashboard =
+      document.getElementById("dashboard");
+
+    const loginBtn =
+      document.getElementById("loginBtn");
+
+    const logoutBtn =
+      document.getElementById("logoutBtn");
+
+    const loginError =
+      document.getElementById("loginError");
+
+    const loginLoading =
+      document.getElementById("loginLoading");
+
+    const dashboardError =
+      document.getElementById("dashboardError");
+
+    function formatNumber(value) {
+      return Number(value ?? 0).toLocaleString("en-US");
+    }
+
+    function showLogin() {
+      loginSection.style.display = "block";
+      dashboard.style.display = "none";
+    }
+
+    function showDashboard() {
+      loginSection.style.display = "none";
+      dashboard.style.display = "block";
+    }
+
+    function clearLoginError() {
+      loginError.textContent = "";
+      loginError.style.display = "none";
+    }
+
+    function showLoginError(message) {
+      loginError.textContent = message;
+      loginError.style.display = "block";
+    }
+
+    async function loadDashboard(user) {
+      dashboardError.textContent = "";
+      dashboardError.style.display = "none";
+
+      document.getElementById("currentUser").textContent =
+        user.email || user.id;
+
+      const { data, error } =
+        await supabaseClient.rpc(
+          "hv_admin_dashboard_stats"
+        );
+
+      if (error) {
+        await supabaseClient.auth.signOut();
+
+        showLogin();
+
+        showLoginError(
+          "無法進入管理中心：" + error.message
+        );
+
+        return;
+      }
+
+      const stats =
+        Array.isArray(data) ? data[0] : data;
+
+      if (!stats) {
+        dashboardError.textContent =
+          "沒有取得平台總覽資料。";
+
+        dashboardError.style.display = "block";
+
+        showDashboard();
+
+        return;
+      }
+
+      document.getElementById("platformMax").textContent =
+        formatNumber(stats.platform_max);
+
+      document.getElementById("currentAccounts").textContent =
+        formatNumber(stats.current_accounts);
+
+      document.getElementById("allocatedQuota").textContent =
+        formatNumber(stats.allocated_quota);
+
+      document.getElementById("availableQuota").textContent =
+        formatNumber(stats.available_quota);
+
+      showDashboard();
+    }
+
+    async function login() {
+      clearLoginError();
+
+      const email =
+        document.getElementById("email")
+          .value
+          .trim();
+
+      const password =
+        document.getElementById("password")
+          .value;
+
+      if (!email || !password) {
+        showLoginError(
+          "請輸入 Email 與密碼。"
+        );
+
+        return;
+      }
+
+      loginLoading.style.display = "block";
+      loginBtn.disabled = true;
+
+      try {
+        const { data, error } =
+          await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
+
+        if (error) {
+          showLoginError(
+            "登入失敗：" + error.message
+          );
+
+          return;
+        }
+
+        if (!data.user) {
+          showLoginError(
+            "登入成功，但沒有取得使用者資料。"
+          );
+
+          return;
+        }
+
+        await loadDashboard(data.user);
+
+      } catch (error) {
+
+        showLoginError(
+          "登入發生錯誤：" +
+          (error.message || String(error))
+        );
+
+      } finally {
+
+        loginLoading.style.display = "none";
+        loginBtn.disabled = false;
+
+      }
+    }
+
+    loginBtn.addEventListener(
+      "click",
+      login
+    );
+
+    document
+      .getElementById("password")
+      .addEventListener(
+        "keydown",
+        function (event) {
+          if (event.key === "Enter") {
+            login();
+          }
+        }
+      );
+
+      logoutBtn.addEventListener(
+      "click",
+      async () => {
+
+        await supabaseClient.auth.signOut();
+
+        document.getElementById("email").value = "";
+        document.getElementById("password").value = "";
+
+        clearLoginError();
+
+        showLogin();
+      }
+    );
+
+    async function restoreSession() {
+      try {
+        const {
+          data: { session },
+          error
+        } =
+          await supabaseClient.auth.getSession();
+
+        if (error) {
+          showLogin();
+          return;
+        }
+
+        if (session && session.user) {
+          await loadDashboard(session.user);
+        } else {
+          showLogin();
+        }
+
+      } catch (error) {
+        showLogin();
+      }
+    }
+
+    restoreSession();
+  </script>
 
 </body>
 </html>
