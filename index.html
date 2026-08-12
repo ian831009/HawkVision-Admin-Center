@@ -212,6 +212,11 @@
     .account-action-btn { background:#eef2ff; color:#3730a3; padding:8px 11px; font-size:13px; white-space:nowrap; }
     .reset-panel { display:none; margin:0 0 20px; padding:20px; border:1px solid #c7d2fe; border-radius:14px; background:#f8faff; }
     .reset-target { margin:6px 0 4px; color:#475569; font-size:14px; }
+    .account-actions { display:flex; gap:6px; flex-wrap:wrap; min-width:180px; }
+    .account-action-btn.name-btn { background:#ecfeff; color:#155e75; }
+    .self-settings { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .self-settings button { width:auto; margin-top:0; }
+    .edit-name-panel { display:none; margin:0 0 20px; padding:20px; border:1px solid #bae6fd; border-radius:14px; background:#f7fdff; }
 
     @media (max-width: 850px) {
       .cards {
@@ -254,7 +259,7 @@
     </div>
 
     <div class="version">
-      Admin Center v1.4.4
+      Admin Center v1.5.0
     </div>
   </header>
 
@@ -303,9 +308,11 @@
           <span id="currentUser">—</span>
         </div>
 
-        <button id="logoutBtn" class="logout">
-          登出
-        </button>
+        <div class="self-settings">
+          <button id="editMyNameBtn" class="account-action-btn name-btn" type="button">修改我的名稱</button>
+          <button id="changeMyPasswordBtn" class="account-action-btn" type="button">修改我的密碼</button>
+          <button id="logoutBtn" class="logout">登出</button>
+        </div>
       </div>
 
       <div class="cards">
@@ -369,6 +376,18 @@
           <div class="create-actions">
             <button id="cancelCreateAccountBtn" class="secondary" type="button">取消</button>
             <button id="submitCreateAccountBtn" class="primary" type="button">建立帳號</button>
+          </div>
+        </div>
+
+        <div id="editNamePanel" class="edit-name-panel">
+          <h3 style="margin-top:0;">修改帳號名稱</h3>
+          <div id="editNameTarget" class="reset-target">—</div>
+          <label for="editNameInput">新名稱</label>
+          <input id="editNameInput" type="text" maxlength="50" autocomplete="off" placeholder="請輸入新名稱" />
+          <div id="editNameMessage" class="form-message"></div>
+          <div class="create-actions">
+            <button id="cancelEditNameBtn" class="secondary" type="button">取消</button>
+            <button id="submitEditNameBtn" class="primary" type="button">確認修改名稱</button>
           </div>
         </div>
 
@@ -503,7 +522,109 @@
       const q = document.getElementById("accountSearch").value.trim().toLowerCase();
       const rows = accountRows.filter(a => [a.display_name,a.email,a.role_name,a.business_role].some(v => String(v ?? "").toLowerCase().includes(q)));
       count.textContent = `顯示 ${rows.length} / ${accountRows.length} 個帳號`;
-      // v1.4.4：帳號密碼管理
+      // v1.5.0：本人與直屬下線名稱管理
+    const editNamePanel = document.getElementById("editNamePanel");
+    const editNameTarget = document.getElementById("editNameTarget");
+    const editNameInput = document.getElementById("editNameInput");
+    const editNameMessage = document.getElementById("editNameMessage");
+    const cancelEditNameBtn = document.getElementById("cancelEditNameBtn");
+    const submitEditNameBtn = document.getElementById("submitEditNameBtn");
+    const editMyNameBtn = document.getElementById("editMyNameBtn");
+    const changeMyPasswordBtn = document.getElementById("changeMyPasswordBtn");
+    let editNameUserId = null;
+
+    function setEditNameMessage(message = "", type = "") {
+      editNameMessage.textContent = message;
+      editNameMessage.className = "form-message" + (type ? " " + type : "");
+    }
+
+    function closeEditName() {
+      editNamePanel.style.display = "none";
+      editNameUserId = null;
+      editNameInput.value = "";
+      setEditNameMessage();
+    }
+
+    function openEditName(userId, email, displayName) {
+      editNameUserId = userId;
+      editNameTarget.textContent = `目標帳號：${displayName || "未命名"}｜${email || userId}`;
+      editNameInput.value = displayName || "";
+      setEditNameMessage();
+      editNamePanel.style.display = "block";
+      editNamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      editNameInput.focus();
+      editNameInput.select();
+    }
+
+    async function submitEditName() {
+      const displayName = editNameInput.value.trim();
+      if (!editNameUserId) {
+        setEditNameMessage("請重新選擇要修改名稱的帳號。", "error");
+        return;
+      }
+      if (!displayName) {
+        setEditNameMessage("名稱不能空白。", "error");
+        return;
+      }
+      if (displayName.length > 50) {
+        setEditNameMessage("名稱最多 50 個字元。", "error");
+        return;
+      }
+
+      submitEditNameBtn.disabled = true;
+      cancelEditNameBtn.disabled = true;
+      setEditNameMessage("正在修改名稱…");
+
+      try {
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+        if (sessionError || !session?.access_token) {
+          throw new Error("登入狀態已失效，請重新登入管理中心。");
+        }
+
+        const response = await fetch(HAWKVISION_ADMIN_API + "/update-display-name", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + session.access_token
+          },
+          body: JSON.stringify({
+            target_user_id: editNameUserId,
+            display_name: displayName
+          })
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || "修改名稱失敗。");
+        }
+
+        setEditNameMessage("名稱修改成功。", "success");
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (user) await loadDashboard(user);
+      } catch (error) {
+        setEditNameMessage("修改失敗：" + (error.message || String(error)), "error");
+      } finally {
+        submitEditNameBtn.disabled = false;
+        cancelEditNameBtn.disabled = false;
+      }
+    }
+
+    document.getElementById("accountTableBody").addEventListener("click", event => {
+      const btn = event.target.closest(".edit-name-btn");
+      if (!btn) return;
+      openEditName(btn.dataset.userId, btn.dataset.email, btn.dataset.name);
+    });
+
+    editMyNameBtn.addEventListener("click", () => {
+      const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
+      if (!me) return;
+      openEditName(me.user_id || me.id, me.email || "", me.display_name || "");
+    });
+
+    cancelEditNameBtn.addEventListener("click", closeEditName);
+    submitEditNameBtn.addEventListener("click", submitEditName);
+
+    // v1.5.0：本人與直屬下線密碼管理
     const resetPasswordPanel = document.getElementById("resetPasswordPanel");
     const resetPasswordTarget = document.getElementById("resetPasswordTarget");
     const resetPasswordInput = document.getElementById("resetPasswordInput");
@@ -598,6 +719,11 @@
       openResetPassword(btn.dataset.userId, btn.dataset.email, btn.dataset.name);
     });
     cancelResetPasswordBtn.addEventListener("click", closeResetPassword);
+    changeMyPasswordBtn.addEventListener("click", () => {
+      const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
+      if (!me) return;
+      openResetPassword(me.user_id || me.id, me.email || "", me.display_name || "");
+    });
     submitResetPasswordBtn.addEventListener("click", resetAccountPassword);
 
     const quotaTarget = document.getElementById("quotaTarget");
@@ -619,7 +745,10 @@
           <td><span class="status-badge ${a.is_enabled ? "status-on" : "status-off"}">${a.is_enabled ? "啟用" : "停用"}</span></td>
           <td>${a.can_create_downline ? "是" : "否"}</td>
           <td>${a.is_platform_owner ? '<span class="status-badge owner-badge">是</span>' : "否"}</td>
-          <td>${String(a.user_id || a.id || "") === String(currentAuthUserId || "") ? "—" : `<button class="account-action-btn reset-password-btn" type="button" data-user-id="${escapeHtml(a.user_id || a.id || "")}" data-email="${escapeHtml(a.email || "")}" data-name="${escapeHtml(a.display_name || "")}">重設密碼</button>`}</td>
+          <td><div class="account-actions">
+            <button class="account-action-btn name-btn edit-name-btn" type="button" data-user-id="${escapeHtml(a.user_id || a.id || "")}" data-email="${escapeHtml(a.email || "")}" data-name="${escapeHtml(a.display_name || "")}">修改名稱</button>
+            <button class="account-action-btn reset-password-btn" type="button" data-user-id="${escapeHtml(a.user_id || a.id || "")}" data-email="${escapeHtml(a.email || "")}" data-name="${escapeHtml(a.display_name || "")}">${String(a.user_id || a.id || "") === String(currentAuthUserId || "") ? "修改密碼" : "重設密碼"}</button>
+          </div></td>
         </tr>`).join("");
     }
 
