@@ -251,7 +251,7 @@
     </div>
 
     <div class="version">
-      Admin Center v1.3.0
+      Admin Center v1.4.0
     </div>
   </header>
 
@@ -386,9 +386,23 @@
 
       <div class="section">
         <h2>額度管理</h2>
-
-        <div class="placeholder">
-          下一階段接入：分配額度、收回未使用額度、已使用額度保護。
+        <p style="color:#64748b;margin-top:-6px;">選擇直屬下線後，可分配或收回尚未使用的系統額度。</p>
+        <div class="create-grid">
+          <div>
+            <label for="quotaTarget">目標帳號</label>
+            <select id="quotaTarget"><option value="">請選擇帳號</option></select>
+          </div>
+          <div>
+            <label for="quotaAmount">額度數量</label>
+            <input id="quotaAmount" type="number" min="1" step="1" placeholder="請輸入正整數" />
+          </div>
+        </div>
+        <label for="quotaReason">原因／備註（選填）</label>
+        <input id="quotaReason" type="text" autocomplete="off" placeholder="例如：本月新增額度" />
+        <div id="quotaMessage" class="form-message"></div>
+        <div class="create-actions">
+          <button id="reclaimQuotaBtn" class="secondary" type="button">收回額度</button>
+          <button id="allocateQuotaBtn" class="primary" type="button">分配額度</button>
         </div>
       </div>
 
@@ -471,6 +485,15 @@
       const q = document.getElementById("accountSearch").value.trim().toLowerCase();
       const rows = accountRows.filter(a => [a.display_name,a.email,a.role_name,a.business_role].some(v => String(v ?? "").toLowerCase().includes(q)));
       count.textContent = `顯示 ${rows.length} / ${accountRows.length} 個帳號`;
+      const quotaTarget = document.getElementById("quotaTarget");
+      if (quotaTarget) {
+        const selected = quotaTarget.value;
+        const candidates = accountRows.filter(a => !a.is_platform_owner && a.is_enabled);
+        quotaTarget.innerHTML = '<option value="">請選擇帳號</option>' + candidates.map(a =>
+          `<option value="${escapeHtml(a.user_id || a.id || "")}">${escapeHtml(a.display_name || a.email || "未命名")}｜${escapeHtml(a.email || "")}｜目前額度 ${escapeHtml(a.system_quota ?? 0)}</option>`
+        ).join("");
+        if ([...quotaTarget.options].some(o => o.value === selected)) quotaTarget.value = selected;
+      }
       if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-row">沒有符合的帳號</td></tr>'; return; }
       body.innerHTML = rows.map(a => `
         <tr>
@@ -718,6 +741,55 @@
         cancelCreateAccountBtn.disabled = false;
       }
     }
+
+    const quotaTarget = document.getElementById("quotaTarget");
+    const quotaAmount = document.getElementById("quotaAmount");
+    const quotaReason = document.getElementById("quotaReason");
+    const quotaMessage = document.getElementById("quotaMessage");
+    const allocateQuotaBtn = document.getElementById("allocateQuotaBtn");
+    const reclaimQuotaBtn = document.getElementById("reclaimQuotaBtn");
+
+    function setQuotaMessage(message = "", type = "") {
+      quotaMessage.textContent = message;
+      quotaMessage.className = "form-message" + (type ? " " + type : "");
+    }
+
+    async function submitQuotaAction(action) {
+      const targetUserId = quotaTarget.value;
+      const amount = Number(quotaAmount.value);
+      const reason = quotaReason.value.trim() || null;
+      if (!targetUserId) { setQuotaMessage("請先選擇目標帳號。", "error"); return; }
+      if (!Number.isInteger(amount) || amount <= 0) { setQuotaMessage("額度數量必須是大於 0 的整數。", "error"); return; }
+
+      allocateQuotaBtn.disabled = true;
+      reclaimQuotaBtn.disabled = true;
+      setQuotaMessage(action === "allocate" ? "正在分配額度…" : "正在收回額度…");
+      try {
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+        if (sessionError || !session?.access_token) throw new Error("登入狀態已失效，請重新登入管理中心。");
+        const response = await fetch(HAWKVISION_ADMIN_API + (action === "allocate" ? "/allocate-quota" : "/reclaim-quota"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
+          body: JSON.stringify({ target_user_id: targetUserId, amount, reason })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.ok) throw new Error(result.error || "額度操作失敗。");
+        const r = result.result || {};
+        setQuotaMessage(`${action === "allocate" ? "分配" : "收回"}成功：${r.quota_before ?? "—"} → ${r.quota_after ?? "—"}；你的剩餘額度 ${r.actor_remaining ?? r.actor_remaining_quota ?? "—"}。`, "success");
+        quotaAmount.value = "";
+        quotaReason.value = "";
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (user) await loadDashboard(user);
+      } catch (error) {
+        setQuotaMessage("操作失敗：" + (error.message || String(error)), "error");
+      } finally {
+        allocateQuotaBtn.disabled = false;
+        reclaimQuotaBtn.disabled = false;
+      }
+    }
+
+    allocateQuotaBtn.addEventListener("click", () => submitQuotaAction("allocate"));
+    reclaimQuotaBtn.addEventListener("click", () => submitQuotaAction("reclaim"));
 
     openCreateAccountBtn.addEventListener("click", openCreateAccount);
     cancelCreateAccountBtn.addEventListener("click", closeCreateAccount);
