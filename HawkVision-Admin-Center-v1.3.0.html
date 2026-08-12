@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>HawkVision 管理中心</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, "Noto Sans TC", sans-serif;
+      background: #f4f6f8;
+      color: #1f2937;
+    }
+
+    header {
+      background: linear-gradient(90deg, #111827, #172554);
+      color: white;
+      padding: 22px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 26px;
+    }
+
+    header p {
+      margin: 7px 0 0;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .version {
+      background: #2563eb;
+      color: white;
+      padding: 9px 16px;
+      border-radius: 999px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 28px auto;
+      padding: 0 20px 50px;
+    }
+
+    .notice {
+      background: white;
+      border-left: 5px solid #2563eb;
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .login-card,
+    .section {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.06);
+    }
+
+    .login-card {
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin: 15px 0 7px;
+      font-weight: 600;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 16px;
+      background: white;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .primary {
+      background: #2563eb;
+      color: white;
+      width: 100%;
+      margin-top: 18px;
+    }
+
+    .logout {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .top-user {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 22px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 22px;
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.06);
+    }
+
+    .card .label {
+      color: #64748b;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .card .value {
+      font-size: 31px;
+      font-weight: 700;
+    }
+
+    .placeholder {
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+      color: #64748b;
+    }
+
+    .error {
+      margin-top: 15px;
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 12px;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .loading {
+      color: #64748b;
+      margin-top: 12px;
+      display: none;
+    }
+
+    #dashboard {
+      display: none;
+    }
+
+
+    .account-toolbar { display:flex; gap:12px; align-items:center; justify-content:space-between; margin:16px 0; flex-wrap:wrap; }
+    .account-toolbar input { max-width:360px; }
+    .account-count { color:#64748b; font-size:14px; }
+    .table-wrap { overflow-x:auto; border:1px solid #e5e7eb; border-radius:12px; }
+    .account-table { width:100%; border-collapse:collapse; min-width:920px; }
+    .account-table th,.account-table td { padding:12px 14px; border-bottom:1px solid #e5e7eb; text-align:left; font-size:14px; }
+    .account-table th { background:#f8fafc; color:#475569; white-space:nowrap; }
+    .account-table tr:last-child td { border-bottom:0; }
+    .role-badge,.status-badge { display:inline-block; padding:4px 9px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
+    .role-badge { background:#dbeafe; color:#1d4ed8; }
+    .status-on { background:#dcfce7; color:#166534; }
+    .status-off { background:#fee2e2; color:#991b1b; }
+    .owner-badge { background:#ede9fe; color:#6d28d9; }
+    .empty-row { text-align:center !important; color:#64748b; padding:28px !important; }
+
+    .toolbar-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .toolbar-actions .create-btn { width:auto; margin-top:0; }
+    .create-panel { display:none; margin:0 0 20px; padding:20px; border:1px solid #dbeafe; border-radius:14px; background:#f8fbff; }
+    .create-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 16px; }
+    .create-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+    .create-actions button { width:auto; margin-top:0; }
+    .secondary { background:#e5e7eb; color:#111827; }
+    .form-message { display:none; margin-top:14px; padding:12px; border-radius:10px; }
+    .form-message.success { display:block; background:#dcfce7; color:#166534; }
+    .form-message.error { display:block; background:#fee2e2; color:#991b1b; }
+
+    @media (max-width: 850px) {
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      header {
+        padding: 18px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .top-user {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .create-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div>
+      <h1>HawkVision 管理中心</h1>
+      <p>平台帳號、層級、額度與權限管理</p>
+    </div>
+
+    <div class="version">
+      Admin Center v1.3.0
+    </div>
+  </header>
+
+  <main>
+
+    <div class="notice">
+      <strong>管理中心已連接 Supabase</strong><br />
+      僅平台最高管理員可以讀取平台總覽資料。
+    </div>
+
+    <section id="loginSection" class="login-card">
+      <h2>管理員登入</h2>
+
+      <label for="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        autocomplete="username"
+        placeholder="請輸入管理員 Email"
+      />
+
+      <label for="password">密碼</label>
+      <input
+        id="password"
+        type="password"
+        autocomplete="current-password"
+        placeholder="請輸入密碼"
+      />
+
+      <button id="loginBtn" class="primary">
+        登入管理中心
+      </button>
+
+      <div id="loginLoading" class="loading">
+        正在登入…
+      </div>
+
+      <div id="loginError" class="error"></div>
+    </section>
+
+    <section id="dashboard">
+
+      <div class="section top-user">
+        <div>
+          <strong>目前登入：</strong>
+          <span id="currentUser">—</span>
+        </div>
+
+        <button id="logoutBtn" class="logout">
+          登出
+        </button>
+      </div>
+
+      <div class="cards">
+
+        <div class="card">
+          <div class="label">平台帳號上限</div>
+          <div id="platformMax" class="value">—</div>
+        </div>
+
+        <div class="card">
+          <div class="label">目前帳號數</div>
+          <div id="currentAccounts" class="value">—</div>
+        </div>
+
+        <div class="card">
+          <div class="label">已分配額度</div>
+          <div id="allocatedQuota" class="value">—</div>
+        </div>
+
+        <div class="card">
+          <div class="label">可分配額度</div>
+          <div id="availableQuota" class="value">—</div>
+        </div>
+
+      </div>
+
+      <div id="dashboardError" class="error"></div>
+
+      <div class="section">
+        <h2>帳號與層級管理</h2>
+
+        <div id="createAccountPanel" class="create-panel">
+          <h3 style="margin-top:0;">新增帳號</h3>
+          <div class="create-grid">
+            <div>
+              <label for="newDisplayName">名稱</label>
+              <input id="newDisplayName" type="text" autocomplete="off" placeholder="請輸入名稱" />
+            </div>
+            <div>
+              <label for="newEmail">Email</label>
+              <input id="newEmail" type="email" autocomplete="off" placeholder="請輸入登入 Email" />
+            </div>
+            <div>
+              <label for="newPassword">初始密碼</label>
+              <input id="newPassword" type="password" autocomplete="new-password" placeholder="至少 8 個字元" />
+            </div>
+            <div>
+              <label for="newBusinessRole">商業層級</label>
+              <select id="newBusinessRole">
+                <option value="">請選擇層級</option>
+                <option value="co_admin">共同管理員</option>
+                <option value="shareholder">股東</option>
+                <option value="master_agent">總代理</option>
+                <option value="agent">代理</option>
+                <option value="sub_agent">子代理</option>
+                <option value="member">會員</option>
+              </select>
+            </div>
+          </div>
+          <div id="createAccountMessage" class="form-message"></div>
+          <div class="create-actions">
+            <button id="cancelCreateAccountBtn" class="secondary" type="button">取消</button>
+            <button id="submitCreateAccountBtn" class="primary" type="button">建立帳號</button>
+          </div>
+        </div>
+
+        <div class="account-toolbar">
+          <input id="accountSearch" type="search" placeholder="搜尋 Email、名稱或角色" />
+          <div class="toolbar-actions">
+            <div id="accountCount" class="account-count">載入中…</div>
+            <button id="openCreateAccountBtn" class="primary create-btn" type="button">＋ 新增帳號</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="account-table">
+            <thead><tr><th>名稱</th><th>Email</th><th>角色</th><th>層級</th><th>狀態</th><th>可建立下線</th><th>平台擁有者</th></tr></thead>
+            <tbody id="accountTableBody"><tr><td colspan="7" class="empty-row">載入中…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>額度管理</h2>
+
+        <div class="placeholder">
+          下一階段接入：分配額度、收回未使用額度、已使用額度保護。
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    const SUPABASE_URL =
+      "https://rwxujvpakpemiwkitltk.supabase.co";
+
+    const SUPABASE_PUBLISHABLE_KEY =
+      "sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
+
+    const HAWKVISION_ADMIN_API =
+      "https://hawkvision-admin-api.michael19941009.workers.dev";
+
+    const supabaseClient =
+      supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY
+      );
+
+    const loginSection =
+      document.getElementById("loginSection");
+
+    const dashboard =
+      document.getElementById("dashboard");
+
+    const loginBtn =
+      document.getElementById("loginBtn");
+
+    const logoutBtn =
+      document.getElementById("logoutBtn");
+
+    const loginError =
+      document.getElementById("loginError");
+
+    const loginLoading =
+      document.getElementById("loginLoading");
+
+    const dashboardError =
+      document.getElementById("dashboardError");
+
+    function formatNumber(value) {
+      return Number(value ?? 0).toLocaleString("en-US");
+    }
+
+    function showLogin() {
+      loginSection.style.display = "block";
+      dashboard.style.display = "none";
+    }
+
+    function showDashboard() {
+      loginSection.style.display = "none";
+      dashboard.style.display = "block";
+    }
+
+    function clearLoginError() {
+      loginError.textContent = "";
+      loginError.style.display = "none";
+    }
+
+    function showLoginError(message) {
+      loginError.textContent = message;
+      loginError.style.display = "block";
+    }
+
+    let accountRows = [];
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
+    }
+
+    function renderAccounts() {
+      const body = document.getElementById("accountTableBody");
+      const count = document.getElementById("accountCount");
+      const q = document.getElementById("accountSearch").value.trim().toLowerCase();
+      const rows = accountRows.filter(a => [a.display_name,a.email,a.role_name,a.business_role].some(v => String(v ?? "").toLowerCase().includes(q)));
+      count.textContent = `顯示 ${rows.length} / ${accountRows.length} 個帳號`;
+      if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-row">沒有符合的帳號</td></tr>'; return; }
+      body.innerHTML = rows.map(a => `
+        <tr>
+          <td>${escapeHtml(a.display_name || "—")}</td>
+          <td>${escapeHtml(a.email || "—")}</td>
+          <td><span class="role-badge">${escapeHtml(a.role_name || a.business_role || "—")}</span></td>
+          <td>${escapeHtml(a.role_level ?? "—")}</td>
+          <td><span class="status-badge ${a.is_enabled ? "status-on" : "status-off"}">${a.is_enabled ? "啟用" : "停用"}</span></td>
+          <td>${a.can_create_downline ? "是" : "否"}</td>
+          <td>${a.is_platform_owner ? '<span class="status-badge owner-badge">是</span>' : "否"}</td>
+        </tr>`).join("");
+    }
+
+    async function loadAccounts() {
+      const { data, error } = await supabaseClient.rpc("hv_admin_list_accounts");
+      if (error) throw error;
+      accountRows = Array.isArray(data) ? data : (data ? [data] : []);
+      renderAccounts();
+    }
+
+    async function loadDashboard(user) {
+      dashboardError.textContent = "";
+      dashboardError.style.display = "none";
+
+      document.getElementById("currentUser").textContent =
+        user.email || user.id;
+
+      const { data, error } =
+        await supabaseClient.rpc(
+          "hv_admin_dashboard_stats"
+        );
+
+      if (error) {
+        await supabaseClient.auth.signOut();
+
+        showLogin();
+
+        showLoginError(
+          "無法進入管理中心：" + error.message
+        );
+
+        return;
+      }
+
+      const stats =
+        Array.isArray(data) ? data[0] : data;
+
+      if (!stats) {
+        dashboardError.textContent =
+          "沒有取得平台總覽資料。";
+
+        dashboardError.style.display = "block";
+
+        showDashboard();
+
+        return;
+      }
+
+      document.getElementById("platformMax").textContent =
+        formatNumber(stats.platform_max);
+
+      document.getElementById("currentAccounts").textContent =
+        formatNumber(stats.current_accounts);
+
+      document.getElementById("allocatedQuota").textContent =
+        formatNumber(stats.allocated_quota);
+
+      document.getElementById("availableQuota").textContent =
+        formatNumber(stats.available_quota);
+
+      try {
+        await loadAccounts();
+      } catch (accountError) {
+        dashboardError.textContent = "帳號清單載入失敗：" + (accountError.message || String(accountError));
+        dashboardError.style.display = "block";
+      }
+
+      showDashboard();
+    }
+
+    async function login() {
+      clearLoginError();
+
+      const email =
+        document.getElementById("email")
+          .value
+          .trim();
+
+      const password =
+        document.getElementById("password")
+          .value;
+
+      if (!email || !password) {
+        showLoginError(
+          "請輸入 Email 與密碼。"
+        );
+
+        return;
+      }
+
+      loginLoading.style.display = "block";
+      loginBtn.disabled = true;
+
+      try {
+        const { data, error } =
+          await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
+
+        if (error) {
+          showLoginError(
+            "登入失敗：" + error.message
+          );
+
+          return;
+        }
+
+        if (!data.user) {
+          showLoginError(
+            "登入成功，但沒有取得使用者資料。"
+          );
+
+          return;
+        }
+
+        await loadDashboard(data.user);
+
+      } catch (error) {
+
+        showLoginError(
+          "登入發生錯誤：" +
+          (error.message || String(error))
+        );
+
+      } finally {
+
+        loginLoading.style.display = "none";
+        loginBtn.disabled = false;
+
+      }
+    }
+
+
+    const createAccountPanel = document.getElementById("createAccountPanel");
+    const openCreateAccountBtn = document.getElementById("openCreateAccountBtn");
+    const cancelCreateAccountBtn = document.getElementById("cancelCreateAccountBtn");
+    const submitCreateAccountBtn = document.getElementById("submitCreateAccountBtn");
+    const createAccountMessage = document.getElementById("createAccountMessage");
+
+    function setCreateMessage(message = "", type = "") {
+      createAccountMessage.textContent = message;
+      createAccountMessage.className = "form-message" + (type ? " " + type : "");
+    }
+
+    function resetCreateAccountForm() {
+      document.getElementById("newDisplayName").value = "";
+      document.getElementById("newEmail").value = "";
+      document.getElementById("newPassword").value = "";
+      document.getElementById("newBusinessRole").value = "";
+      setCreateMessage();
+    }
+
+    function openCreateAccount() {
+      resetCreateAccountForm();
+      createAccountPanel.style.display = "block";
+      createAccountPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function closeCreateAccount() {
+      createAccountPanel.style.display = "none";
+      resetCreateAccountForm();
+    }
+
+    async function createAccount() {
+      const displayName = document.getElementById("newDisplayName").value.trim();
+      const email = document.getElementById("newEmail").value.trim().toLowerCase();
+      const password = document.getElementById("newPassword").value;
+      const businessRole = document.getElementById("newBusinessRole").value;
+
+      if (!displayName || !email || !password || !businessRole) {
+        setCreateMessage("請完整填寫名稱、Email、密碼與商業層級。", "error");
+        return;
+      }
+
+      if (password.length < 8) {
+        setCreateMessage("密碼至少需要 8 個字元。", "error");
+        return;
+      }
+
+      submitCreateAccountBtn.disabled = true;
+      cancelCreateAccountBtn.disabled = true;
+      setCreateMessage("正在建立帳號…");
+
+      try {
+        const { data: { session }, error: sessionError } =
+          await supabaseClient.auth.getSession();
+
+        if (sessionError || !session?.access_token) {
+          throw new Error("登入狀態已失效，請重新登入管理中心。");
+        }
+
+        const response = await fetch(
+          HAWKVISION_ADMIN_API + "/create-account",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + session.access_token
+            },
+            body: JSON.stringify({
+              email: email,
+              password: password,
+              display_name: displayName,
+              business_role: businessRole
+            })
+          }
+        );
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || "建立帳號失敗。");
+        }
+
+        setCreateMessage("帳號建立成功。", "success");
+        document.getElementById("newDisplayName").value = "";
+        document.getElementById("newEmail").value = "";
+        document.getElementById("newPassword").value = "";
+        document.getElementById("newBusinessRole").value = "";
+
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (user) {
+          await loadDashboard(user);
+        } else {
+          await loadAccounts();
+        }
+      } catch (error) {
+        setCreateMessage(
+          "建立失敗：" + (error.message || String(error)),
+          "error"
+        );
+      } finally {
+        submitCreateAccountBtn.disabled = false;
+        cancelCreateAccountBtn.disabled = false;
+      }
+    }
+
+    openCreateAccountBtn.addEventListener("click", openCreateAccount);
+    cancelCreateAccountBtn.addEventListener("click", closeCreateAccount);
+    submitCreateAccountBtn.addEventListener("click", createAccount);
+
+    loginBtn.addEventListener(
+      "click",
+      login
+    );
+
+    document
+      .getElementById("password")
+      .addEventListener(
+        "keydown",
+        function (event) {
+          if (event.key === "Enter") {
+            login();
+          }
+        }
+      );
+
+      logoutBtn.addEventListener(
+      "click",
+      async () => {
+
+        await supabaseClient.auth.signOut();
+
+        document.getElementById("email").value = "";
+        document.getElementById("password").value = "";
+
+        clearLoginError();
+
+        showLogin();
+      }
+    );
+
+    document.getElementById("accountSearch").addEventListener("input", renderAccounts);
+
+    async function restoreSession() {
+      try {
+        const {
+          data: { session },
+          error
+        } =
+          await supabaseClient.auth.getSession();
+
+        if (error) {
+          showLogin();
+          return;
+        }
+
+        if (session && session.user) {
+          await loadDashboard(session.user);
+        } else {
+          showLogin();
+        }
+
+      } catch (error) {
+        showLogin();
+      }
+    }
+
+    restoreSession();
+  </script>
+
+</body>
+</html>
