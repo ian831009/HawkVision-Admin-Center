@@ -3,13 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>HawkVision 管理中心</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -28,16 +25,8 @@
       gap: 20px;
     }
 
-    header h1 {
-      margin: 0;
-      font-size: 26px;
-    }
-
-    header p {
-      margin: 7px 0 0;
-      color: #cbd5e1;
-      font-size: 14px;
-    }
+    header h1 { margin: 0; font-size: 26px; }
+    header p { margin: 7px 0 0; color: #cbd5e1; font-size: 14px; }
 
     .version {
       background: #2563eb;
@@ -54,22 +43,13 @@
       padding: 0 20px 50px;
     }
 
-    .notice {
-      background: white;
-      border-left: 5px solid #2563eb;
-      border-radius: 12px;
-      padding: 18px 20px;
-      margin-bottom: 24px;
-      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.05);
-    }
-
     .login-card,
     .section {
       background: white;
       border-radius: 16px;
       padding: 24px;
       margin-bottom: 24px;
-      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 3px 15px rgba(0,0,0,.06);
     }
 
     .login-card {
@@ -78,57 +58,76 @@
       margin-right: auto;
     }
 
-    h2 {
-      margin-top: 0;
-    }
+    h2 { margin-top: 0; }
 
     label {
       display: block;
-      margin: 15px 0 7px;
+      margin: 14px 0 7px;
       font-weight: 600;
     }
 
     input,
     select {
       width: 100%;
-      padding: 12px 14px;
+      padding: 11px 13px;
       border: 1px solid #cbd5e1;
       border-radius: 10px;
-      font-size: 16px;
+      font-size: 15px;
       background: white;
     }
 
     button {
       border: 0;
       border-radius: 10px;
-      padding: 12px 18px;
-      font-size: 15px;
+      padding: 10px 14px;
+      font-size: 14px;
       cursor: pointer;
     }
 
     button:disabled {
-      opacity: 0.6;
+      opacity: .55;
       cursor: not-allowed;
     }
 
-    .primary {
-      background: #2563eb;
-      color: white;
+    .primary { background: #2563eb; color: white; }
+    .secondary { background: #e5e7eb; color: #111827; }
+    .soft { background: #eef2ff; color: #3730a3; }
+    .soft-cyan { background: #ecfeff; color: #155e75; }
+    .soft-amber { background: #fffbeb; color: #92400e; }
+    .danger-soft { background: #fef2f2; color: #991b1b; }
+
+    .login-card .primary {
       width: 100%;
       margin-top: 18px;
+      padding: 12px 18px;
     }
 
-    .logout {
-      background: #e5e7eb;
-      color: #111827;
-    }
+    #dashboard { display: none; }
 
     .top-user {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 15px;
-      margin-bottom: 22px;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .identity-main {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .identity-role {
+      margin-left: 8px;
+      color: #64748b;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     .cards {
@@ -141,36 +140,193 @@
     .card {
       background: white;
       border-radius: 14px;
-      padding: 22px;
-      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.06);
+      padding: 20px;
+      box-shadow: 0 3px 15px rgba(0,0,0,.06);
     }
 
     .card .label {
       color: #64748b;
-      font-size: 14px;
-      margin-bottom: 12px;
+      font-size: 13px;
+      margin-bottom: 10px;
     }
 
     .card .value {
-      font-size: 31px;
+      font-size: 29px;
       font-weight: 700;
     }
 
-    .placeholder {
-      border: 1px dashed #cbd5e1;
-      border-radius: 12px;
-      padding: 28px;
-      text-align: center;
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .toolbar input {
+      max-width: 330px;
+    }
+
+    .toolbar-right {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .muted {
       color: #64748b;
+      font-size: 13px;
+    }
+
+    .create-panel,
+    .self-panel,
+    .inline-panel {
+      border: 1px solid #dbeafe;
+      background: #f8fbff;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .create-panel,
+    .self-panel {
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 0 14px;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .breadcrumb {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    .breadcrumb button {
+      padding: 5px 8px;
+      background: transparent;
+      color: #2563eb;
+    }
+
+    .context-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .context-title {
+      font-weight: 700;
+    }
+
+    .child-list {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .child-row {
+      padding: 14px;
+      border-bottom: 1px solid #e5e7eb;
+      background: white;
+    }
+
+    .child-row:last-child {
+      border-bottom: 0;
+    }
+
+    .child-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .child-title {
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .child-account {
+      color: #64748b;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .role-badge {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+
+    .role-badge.direct {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+
+    .child-actions {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .inline-panel {
+      margin-top: 12px;
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    .inline-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 0 12px;
+    }
+
+    .inline-status,
+    .page-status {
+      display: none;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .success {
+      background: #dcfce7;
+      color: #166534;
     }
 
     .error {
-      margin-top: 15px;
       background: #fee2e2;
       color: #991b1b;
-      padding: 12px;
-      border-radius: 10px;
-      display: none;
     }
 
     .loading {
@@ -179,88 +335,39 @@
       display: none;
     }
 
-    #dashboard {
-      display: none;
+    .empty {
+      padding: 28px;
+      color: #64748b;
+      text-align: center;
     }
 
-
-    .account-toolbar { display:flex; gap:12px; align-items:center; justify-content:space-between; margin:16px 0; flex-wrap:wrap; }
-    .account-toolbar input { max-width:360px; }
-    .account-count { color:#64748b; font-size:14px; }
-    .table-wrap { overflow-x:auto; border:1px solid #e5e7eb; border-radius:12px; }
-    .account-table { width:100%; border-collapse:collapse; min-width:920px; }
-    .account-table th,.account-table td { padding:12px 14px; border-bottom:1px solid #e5e7eb; text-align:left; font-size:14px; }
-    .account-table th { background:#f8fafc; color:#475569; white-space:nowrap; }
-    .account-table tr:last-child td { border-bottom:0; }
-    .role-badge,.status-badge { display:inline-block; padding:4px 9px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
-    .role-badge { background:#dbeafe; color:#1d4ed8; }
-    .status-on { background:#dcfce7; color:#166534; }
-    .status-off { background:#fee2e2; color:#991b1b; }
-    .owner-badge { background:#ede9fe; color:#6d28d9; }
-    .empty-row { text-align:center !important; color:#64748b; padding:28px !important; }
-
-    .toolbar-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .toolbar-actions .create-btn { width:auto; margin-top:0; }
-    .create-panel { display:none; margin:0 0 20px; padding:20px; border:1px solid #dbeafe; border-radius:14px; background:#f8fbff; }
-    .create-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 16px; }
-    .create-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
-    .create-actions button { width:auto; margin-top:0; }
-    .secondary { background:#e5e7eb; color:#111827; }
-    .form-message { display:none; margin-top:14px; padding:12px; border-radius:10px; }
-    .form-message.success { display:block; background:#dcfce7; color:#166534; }
-    .form-message.error { display:block; background:#fee2e2; color:#991b1b; }
-    .account-action-btn { background:#eef2ff; color:#3730a3; padding:8px 11px; font-size:13px; white-space:nowrap; }
-    .reset-panel { display:none; margin:0 0 20px; padding:20px; border:1px solid #c7d2fe; border-radius:14px; background:#f8faff; }
-    .reset-target { margin:6px 0 4px; color:#475569; font-size:14px; }
-    .account-actions { display:flex; gap:6px; flex-wrap:wrap; min-width:180px; }
-    .account-action-btn.name-btn { background:#ecfeff; color:#155e75; }
-    .self-settings { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .self-settings button { width:auto; margin-top:0; }
-    .edit-name-panel { display:none !important; }
-    .reset-panel { display:none !important; }
-    .inline-edit-row td { background:#f8fafc; padding:10px 14px !important; }
-    .inline-edit-box { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .inline-edit-box input { width:auto; min-width:180px; flex:1 1 180px; padding:9px 11px; font-size:14px; }
-    .inline-edit-box button { width:auto; margin:0; padding:9px 12px; }
-    .inline-edit-label { font-size:13px; font-weight:700; white-space:nowrap; }
-    .inline-status-row td { padding:8px 14px !important; font-size:13px; font-weight:700; }
-    .inline-status-row.success td { background:#dcfce7; color:#166534; }
-    .inline-status-row.error td { background:#fee2e2; color:#991b1b; }
+    .reserved-note {
+      color: #64748b;
+      font-size: 13px;
+      line-height: 1.6;
+    }
 
     @media (max-width: 850px) {
-      .cards {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      header {
-        padding: 18px;
-      }
+      .cards { grid-template-columns: repeat(2, 1fr); }
+      header { padding: 18px; }
     }
 
-    @media (max-width: 520px) {
-      .cards {
-        grid-template-columns: 1fr;
-      }
-
-      .top-user {
-        align-items: flex-start;
-        flex-direction: column;
-      }
-
+    @media (max-width: 560px) {
+      .cards { grid-template-columns: 1fr; }
+      .grid,
+      .inline-grid { grid-template-columns: 1fr; }
       header {
         align-items: flex-start;
         flex-direction: column;
       }
-
-      .create-grid {
-        grid-template-columns: 1fr;
+      .child-actions {
+        justify-content: flex-start;
       }
     }
   </style>
 </head>
 
 <body>
-
   <header>
     <div>
       <h1>HawkVision 管理中心</h1>
@@ -268,31 +375,25 @@
     </div>
 
     <div class="version">
-      Admin Center v1.5.1
+      Admin Center v1.6.0
     </div>
   </header>
 
   <main>
-
-    <div class="notice">
-      <strong>管理中心已連接 Supabase</strong><br />
-      僅平台最高管理員可以讀取平台總覽資料。
-    </div>
-
     <section id="loginSection" class="login-card">
       <h2>管理員登入</h2>
 
-      <label for="email">Email</label>
+      <label for="loginAccount">帳號</label>
       <input
-        id="email"
-        type="email"
+        id="loginAccount"
+        type="text"
         autocomplete="username"
-        placeholder="請輸入管理員 Email"
+        placeholder="請輸入帳號"
       />
 
-      <label for="password">密碼</label>
+      <label for="loginPassword">密碼</label>
       <input
-        id="password"
+        id="loginPassword"
         type="password"
         autocomplete="current-password"
         placeholder="請輸入密碼"
@@ -302,32 +403,35 @@
         登入管理中心
       </button>
 
-      <div id="loginLoading" class="loading">
-        正在登入…
-      </div>
-
-      <div id="loginError" class="error"></div>
+      <div id="loginLoading" class="loading">正在登入…</div>
+      <div id="loginError" class="page-status error"></div>
     </section>
 
     <section id="dashboard">
-
       <div class="section top-user">
         <div>
-          <strong>目前登入：</strong>
-          <span id="currentUser">—</span>
+          <span id="currentName" class="identity-main">—</span>
+          <span id="currentRole" class="identity-role">—</span>
         </div>
 
-        <div class="self-settings">
-          <button id="editMyNameBtn" class="account-action-btn name-btn" type="button">修改我的名稱</button>
-          <button id="changeMyPasswordBtn" class="account-action-btn" type="button">修改我的密碼</button>
-          <button id="logoutBtn" class="logout">登出</button>
+        <div class="top-actions">
+          <button id="editMyNameBtn" class="soft-cyan" type="button">
+            修改我的名稱
+          </button>
+          <button id="editMyPasswordBtn" class="soft" type="button">
+            修改我的密碼
+          </button>
+          <button id="logoutBtn" class="secondary" type="button">
+            登出
+          </button>
         </div>
       </div>
 
-      <div class="cards">
+      <div id="selfPanel" class="section self-panel"></div>
 
+      <div class="cards">
         <div class="card">
-          <div class="label">平台帳號上限</div>
+          <div class="label">可管理帳號容量</div>
           <div id="platformMax" class="value">—</div>
         </div>
 
@@ -345,114 +449,100 @@
           <div class="label">可分配額度</div>
           <div id="availableQuota" class="value">—</div>
         </div>
-
       </div>
 
-      <div id="dashboardError" class="error"></div>
-
       <div class="section">
-        <h2>帳號與層級管理</h2>
+        <div class="toolbar">
+          <input
+            id="accountSearch"
+            type="search"
+            placeholder="搜尋名稱或帳號"
+          />
 
-        <div id="createAccountPanel" class="create-panel">
-          <h3 style="margin-top:0;">新增帳號</h3>
-          <div class="create-grid">
+          <div class="toolbar-right">
+            <span id="accountCount" class="muted">載入中…</span>
+            <button id="openCreateBtn" class="primary" type="button">
+              ＋ 新增帳號
+            </button>
+          </div>
+        </div>
+
+        <div id="createPanel" class="create-panel">
+          <h3 style="margin-top:0;">新增直屬下層</h3>
+
+          <div class="grid">
             <div>
               <label for="newDisplayName">名稱</label>
-              <input id="newDisplayName" type="text" autocomplete="off" placeholder="請輸入名稱" />
+              <input id="newDisplayName" type="text" autocomplete="off" />
             </div>
+
             <div>
-              <label for="newEmail">Email</label>
-              <input id="newEmail" type="email" autocomplete="off" placeholder="請輸入登入 Email" />
+              <label for="newAccount">帳號</label>
+              <input
+                id="newAccount"
+                type="text"
+                autocomplete="off"
+                placeholder="例如 wang01"
+              />
             </div>
+
             <div>
               <label for="newPassword">初始密碼</label>
-              <input id="newPassword" type="password" autocomplete="new-password" placeholder="至少 8 個字元" />
+              <input
+                id="newPassword"
+                type="password"
+                autocomplete="new-password"
+                placeholder="至少 8 個字元"
+              />
             </div>
+
             <div>
-              <label for="newBusinessRole">商業層級</label>
-              <select id="newBusinessRole">
-                <option value="">請選擇層級</option>
-                <option value="co_admin">共同管理員</option>
-                <option value="shareholder">股東</option>
-                <option value="master_agent">總代理</option>
-                <option value="agent">代理</option>
-                <option value="sub_agent">子代理</option>
-                <option value="member">會員</option>
-              </select>
+              <label for="newRole">商業層級</label>
+              <select id="newRole"></select>
+            </div>
+
+            <div id="initialQuotaWrap">
+              <label for="initialQuota">初始額度</label>
+              <input
+                id="initialQuota"
+                type="number"
+                min="0"
+                step="1"
+                value="0"
+              />
             </div>
           </div>
-          <div id="createAccountMessage" class="form-message"></div>
-          <div class="create-actions">
-            <button id="cancelCreateAccountBtn" class="secondary" type="button">取消</button>
-            <button id="submitCreateAccountBtn" class="primary" type="button">建立帳號</button>
+
+          <div class="panel-actions">
+            <button id="cancelCreateBtn" class="secondary" type="button">
+              取消
+            </button>
+            <button id="submitCreateBtn" class="primary" type="button">
+              建立帳號
+            </button>
           </div>
         </div>
 
-        <div id="editNamePanel" class="edit-name-panel">
-          <h3 style="margin-top:0;">修改帳號名稱</h3>
-          <div id="editNameTarget" class="reset-target">—</div>
-          <label for="editNameInput">新名稱</label>
-          <input id="editNameInput" type="text" maxlength="50" autocomplete="off" placeholder="請輸入新名稱" />
-          <div id="editNameMessage" class="form-message"></div>
-          <div class="create-actions">
-            <button id="cancelEditNameBtn" class="secondary" type="button">取消</button>
-            <button id="submitEditNameBtn" class="primary" type="button">確認修改名稱</button>
+        <div id="pageStatus" class="page-status"></div>
+
+        <div id="breadcrumb" class="breadcrumb"></div>
+
+        <div class="context-line">
+          <div>
+            <span class="muted">目前查看：</span>
+            <span id="contextTitle" class="context-title">—</span>
           </div>
+
+          <button id="backLevelBtn" class="secondary" type="button">
+            返回上一層
+          </button>
         </div>
 
-        <div id="resetPasswordPanel" class="reset-panel">
-          <h3 style="margin-top:0;">重設帳號密碼</h3>
-          <div id="resetPasswordTarget" class="reset-target">—</div>
-          <label for="resetPasswordInput">新密碼</label>
-          <input id="resetPasswordInput" type="password" autocomplete="new-password" placeholder="至少 8 個字元" />
-          <label for="resetPasswordConfirm">再次輸入新密碼</label>
-          <input id="resetPasswordConfirm" type="password" autocomplete="new-password" placeholder="再次輸入新密碼" />
-          <div id="resetPasswordMessage" class="form-message"></div>
-          <div class="create-actions">
-            <button id="cancelResetPasswordBtn" class="secondary" type="button">取消</button>
-            <button id="submitResetPasswordBtn" class="primary" type="button">確認重設密碼</button>
-          </div>
-        </div>
-
-        <div class="account-toolbar">
-          <input id="accountSearch" type="search" placeholder="搜尋 Email、名稱或角色" />
-          <div class="toolbar-actions">
-            <div id="accountCount" class="account-count">載入中…</div>
-            <button id="openCreateAccountBtn" class="primary create-btn" type="button">＋ 新增帳號</button>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="account-table">
-            <thead><tr><th>名稱</th><th>Email</th><th>角色</th><th>層級</th><th>狀態</th><th>可建立下線</th><th>平台擁有者</th><th>帳號操作</th></tr></thead>
-            <tbody id="accountTableBody"><tr><td colspan="8" class="empty-row">載入中…</td></tr></tbody>
-          </table>
+        <div id="childList" class="child-list">
+          <div class="empty">載入中…</div>
         </div>
       </div>
-
-      <div class="section">
-        <h2>額度管理</h2>
-        <p style="color:#64748b;margin-top:-6px;">選擇直屬下線後，可分配或收回尚未使用的系統額度。</p>
-        <div class="create-grid">
-          <div>
-            <label for="quotaTarget">目標帳號</label>
-            <select id="quotaTarget"><option value="">請選擇帳號</option></select>
-          </div>
-          <div>
-            <label for="quotaAmount">額度數量</label>
-            <input id="quotaAmount" type="number" min="1" step="1" placeholder="請輸入正整數" />
-          </div>
-        </div>
-        <label for="quotaReason">原因／備註（選填）</label>
-        <input id="quotaReason" type="text" autocomplete="off" placeholder="例如：本月新增額度" />
-        <div id="quotaMessage" class="form-message"></div>
-        <div class="create-actions">
-          <button id="reclaimQuotaBtn" class="secondary" type="button">收回額度</button>
-          <button id="allocateQuotaBtn" class="primary" type="button">分配額度</button>
-        </div>
-      </div>
-
     </section>
-
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -473,29 +563,105 @@
         SUPABASE_PUBLISHABLE_KEY
       );
 
+    const ROLE_ORDER = [
+      "super_admin",
+      "co_admin",
+      "shareholder",
+      "master_agent",
+      "agent",
+      "sub_agent",
+      "member"
+    ];
+
+    const ROLE_LABELS = {
+      super_admin: "最高管理員",
+      co_admin: "共同管理員",
+      shareholder: "股東",
+      master_agent: "總代理",
+      agent: "代理",
+      sub_agent: "子代理",
+      member: "會員"
+    };
+
+    let currentUser = null;
+    let currentAccount = null;
+    let currentChildren = [];
+    let contextStack = [];
+    let pageStatusTimer = null;
+
     const loginSection =
       document.getElementById("loginSection");
 
     const dashboard =
       document.getElementById("dashboard");
 
-    const loginBtn =
-      document.getElementById("loginBtn");
-
-    const logoutBtn =
-      document.getElementById("logoutBtn");
-
-    const loginError =
-      document.getElementById("loginError");
-
-    const loginLoading =
-      document.getElementById("loginLoading");
-
-    const dashboardError =
-      document.getElementById("dashboardError");
+    function escapeHtml(value) {
+      return String(value ?? "").replace(
+        /[&<>"']/g,
+        ch => ({
+          "&":"&amp;",
+          "<":"&lt;",
+          ">":"&gt;",
+          '"':"&quot;",
+          "'":"&#039;"
+        }[ch])
+      );
+    }
 
     function formatNumber(value) {
-      return Number(value ?? 0).toLocaleString("en-US");
+      return Number(value ?? 0)
+        .toLocaleString("en-US");
+    }
+
+    function showPageStatus(message, type = "success") {
+      const box =
+        document.getElementById("pageStatus");
+
+      box.textContent = message;
+      box.className =
+        "page-status " + type;
+      box.style.display = "block";
+
+      if (pageStatusTimer) {
+        clearTimeout(pageStatusTimer);
+      }
+
+      pageStatusTimer =
+        setTimeout(() => {
+          box.style.display = "none";
+          box.textContent = "";
+        }, 3000);
+    }
+
+    function showLoginError(message) {
+      const box =
+        document.getElementById("loginError");
+
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function clearLoginError() {
+      const box =
+        document.getElementById("loginError");
+
+      box.textContent = "";
+      box.style.display = "none";
+    }
+
+    function normalizeLoginAccount(raw) {
+      const value =
+        String(raw || "")
+          .trim()
+          .toLowerCase();
+
+      if (value.includes("@")) {
+        return value;
+      }
+
+      return value
+        ? value + "@hawkvision.local"
+        : "";
     }
 
     function showLogin() {
@@ -508,767 +674,1698 @@
       dashboard.style.display = "block";
     }
 
-    function clearLoginError() {
-      loginError.textContent = "";
-      loginError.style.display = "none";
-    }
+    async function getSessionToken() {
+      const {
+        data: { session },
+        error
+      } =
+        await supabaseClient.auth.getSession();
 
-    function showLoginError(message) {
-      loginError.textContent = message;
-      loginError.style.display = "block";
-    }
-
-    let accountRows = [];
-    let currentAuthUserId = null;
-
-    function escapeHtml(value) {
-      return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
-    }
-
-    function renderAccounts() {
-      const body = document.getElementById("accountTableBody");
-      const count = document.getElementById("accountCount");
-      const q = document.getElementById("accountSearch").value.trim().toLowerCase();
-      const rows = accountRows.filter(a => [a.display_name,a.email,a.role_name,a.business_role].some(v => String(v ?? "").toLowerCase().includes(q)));
-      count.textContent = `顯示 ${rows.length} / ${accountRows.length} 個帳號`;
-      // v1.5.1：帳號列下方的小型名稱／密碼編輯器
-    let inlineEditorRow = null;
-    let inlineStatusTimer = null;
-
-    function removeInlineEditor() {
-      if (inlineEditorRow) {
-        inlineEditorRow.remove();
-        inlineEditorRow = null;
+      if (
+        error ||
+        !session?.access_token
+      ) {
+        throw new Error(
+          "登入狀態已失效，請重新登入"
+        );
       }
+
+      return session.access_token;
     }
 
-    function showInlineStatus(sourceRow, message, type = "success") {
-      document.querySelectorAll(".inline-status-row").forEach(row => row.remove());
-      if (inlineStatusTimer) clearTimeout(inlineStatusTimer);
+    function roleRank(role) {
+      const idx =
+        ROLE_ORDER.indexOf(role);
 
-      const statusRow = document.createElement("tr");
-      statusRow.className = `inline-status-row ${type}`;
-      statusRow.innerHTML = `<td colspan="9">${escapeHtml(message)}</td>`;
-      sourceRow.insertAdjacentElement("afterend", statusRow);
+      return idx === -1
+        ? 999
+        : idx;
+    }
 
-      inlineStatusTimer = setTimeout(() => {
-        statusRow.remove();
+    function allowedCreateRoles() {
+      if (!currentAccount) return [];
+
+      const actorRank =
+        currentAccount.is_platform_owner
+          ? 0
+          : roleRank(
+              currentAccount.business_role
+            );
+
+      return ROLE_ORDER
+        .slice(actorRank + 1)
+        .filter(role =>
+          role !== "super_admin"
+        );
+    }
+
+    function populateRoleOptions() {
+      const select =
+        document.getElementById("newRole");
+
+      const roles =
+        allowedCreateRoles();
+
+      select.innerHTML =
+        '<option value="">請選擇層級</option>' +
+        roles.map(role =>
+          `<option value="${role}">
+            ${ROLE_LABELS[role] || role}
+          </option>`
+        ).join("");
+
+      document.getElementById(
+        "openCreateBtn"
+      ).style.display =
+        roles.length
+          ? "inline-block"
+          : "none";
+    }
+
+    function resetCreateForm() {
+      document.getElementById(
+        "newDisplayName"
+      ).value = "";
+
+      document.getElementById(
+        "newAccount"
+      ).value = "";
+
+      document.getElementById(
+        "newPassword"
+      ).value = "";
+
+      document.getElementById(
+        "newRole"
+      ).value = "";
+
+      document.getElementById(
+        "initialQuota"
+      ).value = "0";
+
+      document.getElementById(
+        "initialQuotaWrap"
+      ).style.display = "block";
+    }
+
+    function closeCreatePanel() {
+      document.getElementById(
+        "createPanel"
+      ).style.display = "none";
+
+      resetCreateForm();
+    }
+
+    function openCreatePanel() {
+      resetCreateForm();
+      document.getElementById(
+        "createPanel"
+      ).style.display = "block";
+    }
+
+    function renderBreadcrumb() {
+      const box =
+        document.getElementById(
+          "breadcrumb"
+        );
+
+      box.innerHTML =
+        contextStack.map(
+          (item, index) => {
+            const label =
+              item.display_name ||
+              item.account ||
+              "未命名";
+
+            return `
+              <button
+                type="button"
+                data-index="${index}"
+              >${escapeHtml(label)}</button>
+              ${
+                index <
+                contextStack.length - 1
+                  ? "<span>›</span>"
+                  : ""
+              }
+            `;
+          }
+        ).join("");
+
+      box.querySelectorAll(
+        "button[data-index]"
+      ).forEach(btn => {
+        btn.addEventListener(
+          "click",
+          async () => {
+            const index =
+              Number(
+                btn.dataset.index
+              );
+
+            contextStack =
+              contextStack.slice(
+                0,
+                index + 1
+              );
+
+            await loadChildren(
+              contextStack[
+                contextStack.length - 1
+              ]
+            );
+          }
+        );
+      });
+    }
+
+    function renderContextHeader() {
+      const context =
+        contextStack[
+          contextStack.length - 1
+        ];
+
+      document.getElementById(
+        "contextTitle"
+      ).textContent =
+        context
+          ? `${context.display_name || context.account}｜${context.role_name || ROLE_LABELS[context.business_role] || ""}`
+          : "—";
+
+      document.getElementById(
+        "backLevelBtn"
+      ).style.display =
+        contextStack.length > 1
+          ? "inline-block"
+          : "none";
+
+      renderBreadcrumb();
+    }
+
+    function visibleChildren() {
+      const q =
+        document.getElementById(
+          "accountSearch"
+        ).value
+          .trim()
+          .toLowerCase();
+
+      if (!q) return currentChildren;
+
+      return currentChildren.filter(
+        child =>
+          [
+            child.display_name,
+            child.account,
+            child.role_name,
+            child.business_role
+          ].some(
+            value =>
+              String(value || "")
+                .toLowerCase()
+                .includes(q)
+          )
+      );
+    }
+
+    function roleDisplay(child) {
+      const base =
+        child.role_name ||
+        ROLE_LABELS[
+          child.business_role
+        ] ||
+        child.business_role;
+
+      return child.is_cross_level
+        ? "直屬" + base
+        : base;
+    }
+
+    function renderChildren() {
+      const list =
+        document.getElementById(
+          "childList"
+        );
+
+      const rows =
+        visibleChildren();
+
+      document.getElementById(
+        "accountCount"
+      ).textContent =
+        `顯示 ${rows.length} / ${currentChildren.length} 個下層`;
+
+      if (!rows.length) {
+        list.innerHTML =
+          '<div class="empty">目前沒有符合的直屬下層</div>';
+        return;
+      }
+
+      list.innerHTML =
+        rows.map(child => {
+          const isMember =
+            child.business_role ===
+            "member";
+
+          const quotaAllowed =
+            !isMember &&
+            String(child.parent_id) ===
+              String(currentUser.id);
+
+          const canEnter =
+            !isMember &&
+            child.can_create_downline;
+
+          return `
+            <div
+              class="child-row"
+              data-user-id="${escapeHtml(child.user_id)}"
+            >
+              <div class="child-head">
+                <div>
+                  <div class="child-title">
+                    ${escapeHtml(child.display_name || "未命名")}
+                    <span class="role-badge ${child.is_cross_level ? "direct" : ""}">
+                      ${escapeHtml(roleDisplay(child))}
+                    </span>
+                  </div>
+
+                  <div class="child-account">
+                    帳號：${escapeHtml(child.account || "—")}
+                  </div>
+                </div>
+
+                <div class="child-actions">
+                  ${
+                    quotaAllowed
+                      ? `<button class="soft quota-btn" type="button">額度管理</button>`
+                      : ""
+                  }
+
+                  <button class="soft-amber permission-btn" type="button">
+                    權限管理
+                  </button>
+
+                  <button class="soft-amber time-btn" type="button">
+                    使用時間管理
+                  </button>
+
+                  <button class="soft-cyan name-btn" type="button">
+                    修改名稱
+                  </button>
+
+                  <button class="soft password-btn" type="button">
+                    修改密碼
+                  </button>
+
+                  ${
+                    canEnter
+                      ? `<button class="secondary enter-btn" type="button">查看下層 ›</button>`
+                      : ""
+                  }
+                </div>
+              </div>
+
+              <div class="inline-host"></div>
+            </div>
+          `;
+        }).join("");
+
+      rows.forEach(child => {
+        const row =
+          list.querySelector(
+            `.child-row[data-user-id="${CSS.escape(String(child.user_id))}"]`
+          );
+
+        if (!row) return;
+
+        row.querySelector(
+          ".quota-btn"
+        )?.addEventListener(
+          "click",
+          () =>
+            openQuotaPanel(
+              row,
+              child
+            )
+        );
+
+        row.querySelector(
+          ".permission-btn"
+        ).addEventListener(
+          "click",
+          () =>
+            openReservedPanel(
+              row,
+              "權限管理",
+              "權限管理的位置已完成預留。權限項目尚未定稿，因此本版不先猜測實際權限開關。"
+            )
+        );
+
+        row.querySelector(
+          ".time-btn"
+        ).addEventListener(
+          "click",
+          () =>
+            openReservedPanel(
+              row,
+              "使用時間管理",
+              "使用時間管理的位置已完成預留。開始時間、到期時間、星期與每日時段等規則待定稿後直接接在這裡。"
+            )
+        );
+
+        row.querySelector(
+          ".name-btn"
+        ).addEventListener(
+          "click",
+          () =>
+            openNamePanel(
+              row,
+              child
+            )
+        );
+
+        row.querySelector(
+          ".password-btn"
+        ).addEventListener(
+          "click",
+          () =>
+            openPasswordPanel(
+              row,
+              child
+            )
+        );
+
+        row.querySelector(
+          ".enter-btn"
+        )?.addEventListener(
+          "click",
+          async () => {
+            contextStack.push(child);
+            await loadChildren(child);
+          }
+        );
+      });
+    }
+
+    function hostFor(row) {
+      document
+        .querySelectorAll(
+          ".inline-host"
+        )
+        .forEach(host => {
+          host.innerHTML = "";
+        });
+
+      return row.querySelector(
+        ".inline-host"
+      );
+    }
+
+    function inlineStatus(
+      row,
+      message,
+      type = "success"
+    ) {
+      const host = hostFor(row);
+
+      host.innerHTML = `
+        <div class="inline-status ${type}" style="display:block;">
+          ${escapeHtml(message)}
+        </div>
+      `;
+
+      setTimeout(() => {
+        host.innerHTML = "";
       }, 3000);
     }
 
-    function findAccountRow(userId) {
-      const button = document.querySelector(`.account-action-btn[data-user-id="${CSS.escape(String(userId))}"]`);
-      return button ? button.closest("tr") : null;
-    }
+    function openReservedPanel(
+      row,
+      title,
+      message
+    ) {
+      const host = hostFor(row);
 
-    function openInlineNameEditor(userId, displayName) {
-      removeInlineEditor();
-      const sourceRow = findAccountRow(userId);
-      if (!sourceRow) return;
-
-      const row = document.createElement("tr");
-      row.className = "inline-edit-row";
-      row.innerHTML = `
-        <td colspan="9">
-          <div class="inline-edit-box">
-            <span class="inline-edit-label">修改名稱</span>
-            <input class="inline-name-input" type="text" maxlength="50" value="${escapeHtml(displayName || "")}" placeholder="請輸入新名稱">
-            <button class="primary inline-name-submit" type="button">確認</button>
-            <button class="secondary inline-cancel" type="button">取消</button>
+      host.innerHTML = `
+        <div class="inline-panel">
+          <strong>${escapeHtml(title)}</strong>
+          <p class="reserved-note">
+            ${escapeHtml(message)}
+          </p>
+          <div class="panel-actions">
+            <button class="secondary close-inline" type="button">
+              關閉
+            </button>
           </div>
-        </td>`;
-      sourceRow.insertAdjacentElement("afterend", row);
-      inlineEditorRow = row;
+        </div>
+      `;
 
-      const input = row.querySelector(".inline-name-input");
-      input.focus();
-      input.select();
-
-      row.querySelector(".inline-cancel").addEventListener("click", removeInlineEditor);
-      row.querySelector(".inline-name-submit").addEventListener("click", async () => {
-        const displayNameNew = input.value.trim();
-        if (!displayNameNew) {
-          showInlineStatus(sourceRow, "修改失敗：名稱不能空白", "error");
-          return;
+      host.querySelector(
+        ".close-inline"
+      ).addEventListener(
+        "click",
+        () => {
+          host.innerHTML = "";
         }
-
-        const submit = row.querySelector(".inline-name-submit");
-        submit.disabled = true;
-        try {
-          const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-          if (sessionError || !session?.access_token) throw new Error("登入狀態已失效，請重新登入");
-
-          const response = await fetch(HAWKVISION_ADMIN_API + "/update-display-name", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": "Bearer " + session.access_token
-            },
-            body: JSON.stringify({ target_user_id: userId, display_name: displayNameNew })
-          });
-          const result = await response.json().catch(() => ({}));
-          if (!response.ok || !result.ok) throw new Error(result.error || "修改名稱失敗");
-
-          removeInlineEditor();
-          showInlineStatus(sourceRow, "✓ 名稱修改成功", "success");
-          const { data: { user } } = await supabaseClient.auth.getUser();
-          if (user) setTimeout(() => loadDashboard(user), 3000);
-        } catch (error) {
-          showInlineStatus(sourceRow, "修改失敗：" + (error.message || String(error)), "error");
-          submit.disabled = false;
-        }
-      });
+      );
     }
 
-    function openInlinePasswordEditor(userId) {
-      removeInlineEditor();
-      const sourceRow = findAccountRow(userId);
-      if (!sourceRow) return;
+    function openNamePanel(
+      row,
+      child
+    ) {
+      const host = hostFor(row);
 
-      const row = document.createElement("tr");
-      row.className = "inline-edit-row";
-      row.innerHTML = `
-        <td colspan="9">
-          <div class="inline-edit-box">
-            <span class="inline-edit-label">修改密碼</span>
-            <input class="inline-pass-1" type="password" autocomplete="new-password" placeholder="新密碼（至少 8 字元）">
-            <input class="inline-pass-2" type="password" autocomplete="new-password" placeholder="再次輸入新密碼">
-            <button class="primary inline-pass-submit" type="button">確認</button>
-            <button class="secondary inline-cancel" type="button">取消</button>
+      host.innerHTML = `
+        <div class="inline-panel">
+          <div class="inline-grid">
+            <div>
+              <label>新名稱</label>
+              <input
+                class="edit-name-input"
+                type="text"
+                maxlength="50"
+                value="${escapeHtml(child.display_name || "")}"
+              />
+            </div>
           </div>
-        </td>`;
-      sourceRow.insertAdjacentElement("afterend", row);
-      inlineEditorRow = row;
-      row.querySelector(".inline-pass-1").focus();
 
-      row.querySelector(".inline-cancel").addEventListener("click", removeInlineEditor);
-      row.querySelector(".inline-pass-submit").addEventListener("click", async () => {
-        const p1 = row.querySelector(".inline-pass-1").value;
-        const p2 = row.querySelector(".inline-pass-2").value;
+          <div class="panel-actions">
+            <button class="secondary close-inline" type="button">
+              取消
+            </button>
+            <button class="primary submit-name" type="button">
+              確認修改
+            </button>
+          </div>
+        </div>
+      `;
 
-        if (p1.length < 8) {
-          showInlineStatus(sourceRow, "重設失敗：新密碼至少需要 8 個字元", "error");
-          return;
+      host.querySelector(
+        ".close-inline"
+      ).addEventListener(
+        "click",
+        () => {
+          host.innerHTML = "";
         }
-        if (p1 !== p2) {
-          showInlineStatus(sourceRow, "重設失敗：兩次輸入的密碼不一致", "error");
-          return;
+      );
+
+      host.querySelector(
+        ".submit-name"
+      ).addEventListener(
+        "click",
+        async event => {
+          const button =
+            event.currentTarget;
+
+          const value =
+            host.querySelector(
+              ".edit-name-input"
+            ).value.trim();
+
+          if (!value) {
+            inlineStatus(
+              row,
+              "修改失敗：名稱不能空白",
+              "error"
+            );
+            return;
+          }
+
+          button.disabled = true;
+
+          try {
+            const token =
+              await getSessionToken();
+
+            const response =
+              await fetch(
+                HAWKVISION_ADMIN_API +
+                "/update-display-name",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                    "Authorization":
+                      "Bearer " + token
+                  },
+                  body: JSON.stringify({
+                    target_user_id:
+                      child.user_id,
+                    display_name:
+                      value
+                  })
+                }
+              );
+
+            const result =
+              await response
+                .json()
+                .catch(() => ({}));
+
+            if (
+              !response.ok ||
+              !result.ok
+            ) {
+              throw new Error(
+                result.error ||
+                "修改名稱失敗"
+              );
+            }
+
+            child.display_name =
+              value;
+
+            renderChildren();
+
+            const refreshedRow =
+              document.querySelector(
+                `.child-row[data-user-id="${CSS.escape(String(child.user_id))}"]`
+              );
+
+            if (refreshedRow) {
+              inlineStatus(
+                refreshedRow,
+                "✓ 名稱修改成功"
+              );
+            }
+          } catch (error) {
+            inlineStatus(
+              row,
+              "修改失敗：" +
+              (
+                error.message ||
+                String(error)
+              ),
+              "error"
+            );
+          }
         }
+      );
+    }
 
-        const submit = row.querySelector(".inline-pass-submit");
-        submit.disabled = true;
-        try {
-          const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-          if (sessionError || !session?.access_token) throw new Error("登入狀態已失效，請重新登入");
+    function openPasswordPanel(
+      row,
+      child
+    ) {
+      const host = hostFor(row);
 
-          const response = await fetch(HAWKVISION_ADMIN_API + "/reset-password", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": "Bearer " + session.access_token
-            },
-            body: JSON.stringify({ target_user_id: userId, new_password: p1 })
-          });
-          const result = await response.json().catch(() => ({}));
-          if (!response.ok || !result.ok) throw new Error(result.error || "密碼重設失敗");
+      host.innerHTML = `
+        <div class="inline-panel">
+          <div class="inline-grid">
+            <div>
+              <label>新密碼</label>
+              <input class="pass1" type="password" autocomplete="new-password" />
+            </div>
 
-          removeInlineEditor();
-          showInlineStatus(sourceRow, "✓ 密碼重設成功", "success");
-        } catch (error) {
-          showInlineStatus(sourceRow, "重設失敗：" + (error.message || String(error)), "error");
-          submit.disabled = false;
+            <div>
+              <label>再次輸入新密碼</label>
+              <input class="pass2" type="password" autocomplete="new-password" />
+            </div>
+          </div>
+
+          <div class="panel-actions">
+            <button class="secondary close-inline" type="button">
+              取消
+            </button>
+            <button class="primary submit-password" type="button">
+              確認修改
+            </button>
+          </div>
+        </div>
+      `;
+
+      host.querySelector(
+        ".close-inline"
+      ).addEventListener(
+        "click",
+        () => {
+          host.innerHTML = "";
         }
-      });
+      );
+
+      host.querySelector(
+        ".submit-password"
+      ).addEventListener(
+        "click",
+        async event => {
+          const p1 =
+            host.querySelector(
+              ".pass1"
+            ).value;
+
+          const p2 =
+            host.querySelector(
+              ".pass2"
+            ).value;
+
+          if (p1.length < 8) {
+            inlineStatus(
+              row,
+              "修改失敗：密碼至少需要 8 個字元",
+              "error"
+            );
+            return;
+          }
+
+          if (p1 !== p2) {
+            inlineStatus(
+              row,
+              "修改失敗：兩次輸入的密碼不一致",
+              "error"
+            );
+            return;
+          }
+
+          event.currentTarget.disabled =
+            true;
+
+          try {
+            const token =
+              await getSessionToken();
+
+            const response =
+              await fetch(
+                HAWKVISION_ADMIN_API +
+                "/reset-password",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                    "Authorization":
+                      "Bearer " + token
+                  },
+                  body: JSON.stringify({
+                    target_user_id:
+                      child.user_id,
+                    new_password:
+                      p1
+                  })
+                }
+              );
+
+            const result =
+              await response
+                .json()
+                .catch(() => ({}));
+
+            if (
+              !response.ok ||
+              !result.ok
+            ) {
+              throw new Error(
+                result.error ||
+                "修改密碼失敗"
+              );
+            }
+
+            inlineStatus(
+              row,
+              "✓ 密碼修改成功"
+            );
+          } catch (error) {
+            inlineStatus(
+              row,
+              "修改失敗：" +
+              (
+                error.message ||
+                String(error)
+              ),
+              "error"
+            );
+          }
+        }
+      );
     }
 
-    // Capture clicks before the older v1.5.0 handlers and use the compact editor instead.
-    document.getElementById("accountTableBody").addEventListener("click", event => {
-      const nameBtn = event.target.closest(".edit-name-btn");
-      const passwordBtn = event.target.closest(".reset-password-btn");
-      if (!nameBtn && !passwordBtn) return;
+    function openQuotaPanel(
+      row,
+      child
+    ) {
+      const host = hostFor(row);
 
-      event.preventDefault();
-      event.stopImmediatePropagation();
+      host.innerHTML = `
+        <div class="inline-panel">
+          <div class="muted">
+            目前額度：
+            <strong>${formatNumber(child.system_quota)}</strong>
+          </div>
 
-      const btn = nameBtn || passwordBtn;
-      if (nameBtn) {
-        openInlineNameEditor(btn.dataset.userId, btn.dataset.name);
-      } else {
-        openInlinePasswordEditor(btn.dataset.userId);
-      }
-    }, true);
+          <div class="inline-grid">
+            <div>
+              <label>額度數量</label>
+              <input class="quota-amount" type="number" min="1" step="1" />
+            </div>
 
-    // v1.5.0：本人與直屬下線名稱管理
-    const editNamePanel = document.getElementById("editNamePanel");
-    const editNameTarget = document.getElementById("editNameTarget");
-    const editNameInput = document.getElementById("editNameInput");
-    const editNameMessage = document.getElementById("editNameMessage");
-    const cancelEditNameBtn = document.getElementById("cancelEditNameBtn");
-    const submitEditNameBtn = document.getElementById("submitEditNameBtn");
-    const editMyNameBtn = document.getElementById("editMyNameBtn");
-    const changeMyPasswordBtn = document.getElementById("changeMyPasswordBtn");
-    let editNameUserId = null;
+            <div>
+              <label>原因／備註（選填）</label>
+              <input class="quota-reason" type="text" />
+            </div>
+          </div>
 
-    function setEditNameMessage(message = "", type = "") {
-      editNameMessage.textContent = message;
-      editNameMessage.className = "form-message" + (type ? " " + type : "");
+          <div class="panel-actions">
+            <button class="secondary close-inline" type="button">
+              取消
+            </button>
+            <button class="danger-soft reclaim-quota" type="button">
+              收回額度
+            </button>
+            <button class="primary allocate-quota" type="button">
+              分配額度
+            </button>
+          </div>
+        </div>
+      `;
+
+      host.querySelector(
+        ".close-inline"
+      ).addEventListener(
+        "click",
+        () => {
+          host.innerHTML = "";
+        }
+      );
+
+      const run =
+        async action => {
+          const amount =
+            Number(
+              host.querySelector(
+                ".quota-amount"
+              ).value
+            );
+
+          const reason =
+            host.querySelector(
+              ".quota-reason"
+            ).value.trim();
+
+          if (
+            !Number.isInteger(amount) ||
+            amount <= 0
+          ) {
+            inlineStatus(
+              row,
+              "操作失敗：額度必須是大於 0 的整數",
+              "error"
+            );
+            return;
+          }
+
+          const buttons =
+            host.querySelectorAll(
+              "button"
+            );
+
+          buttons.forEach(
+            button =>
+              button.disabled = true
+          );
+
+          try {
+            const token =
+              await getSessionToken();
+
+            const endpoint =
+              action === "allocate"
+                ? "/allocate-quota"
+                : "/reclaim-quota";
+
+            const response =
+              await fetch(
+                HAWKVISION_ADMIN_API +
+                endpoint,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                    "Authorization":
+                      "Bearer " + token
+                  },
+                  body: JSON.stringify({
+                    target_user_id:
+                      child.user_id,
+                    amount,
+                    reason
+                  })
+                }
+              );
+
+            const result =
+              await response
+                .json()
+                .catch(() => ({}));
+
+            if (
+              !response.ok ||
+              !result.ok
+            ) {
+              throw new Error(
+                result.error ||
+                "額度操作失敗"
+              );
+            }
+
+            const r =
+              result.result || {};
+
+            child.system_quota =
+              r.quota_after ??
+              child.system_quota;
+
+            renderChildren();
+
+            const refreshedRow =
+              document.querySelector(
+                `.child-row[data-user-id="${CSS.escape(String(child.user_id))}"]`
+              );
+
+            if (refreshedRow) {
+              inlineStatus(
+                refreshedRow,
+                `✓ ${
+                  action === "allocate"
+                    ? "額度分配"
+                    : "額度收回"
+                }成功`
+              );
+            }
+
+            await refreshStats();
+          } catch (error) {
+            inlineStatus(
+              row,
+              "操作失敗：" +
+              (
+                error.message ||
+                String(error)
+              ),
+              "error"
+            );
+          }
+        };
+
+      host.querySelector(
+        ".allocate-quota"
+      ).addEventListener(
+        "click",
+        () => run("allocate")
+      );
+
+      host.querySelector(
+        ".reclaim-quota"
+      ).addEventListener(
+        "click",
+        () => run("reclaim")
+      );
     }
 
-    function closeEditName() {
-      editNamePanel.style.display = "none";
-      editNameUserId = null;
-      editNameInput.value = "";
-      setEditNameMessage();
-    }
+    async function loadChildren(context) {
+      renderContextHeader();
 
-    function openEditName(userId, email, displayName) {
-      editNameUserId = userId;
-      editNameTarget.textContent = `目標帳號：${displayName || "未命名"}｜${email || userId}`;
-      editNameInput.value = displayName || "";
-      setEditNameMessage();
-      editNamePanel.style.display = "block";
-      editNamePanel.scrollIntoView({ behavior: "smooth", block: "start" });
-      editNameInput.focus();
-      editNameInput.select();
-    }
+      const list =
+        document.getElementById(
+          "childList"
+        );
 
-    async function submitEditName() {
-      const displayName = editNameInput.value.trim();
-      if (!editNameUserId) {
-        setEditNameMessage("請重新選擇要修改名稱的帳號。", "error");
+      list.innerHTML =
+        '<div class="empty">載入中…</div>';
+
+      const {
+        data,
+        error
+      } =
+        await supabaseClient.rpc(
+          "hv_admin_list_children",
+          {
+            p_parent_user_id:
+              context.user_id
+          }
+        );
+
+      if (error) {
+        list.innerHTML =
+          `<div class="empty">載入失敗：${escapeHtml(error.message)}</div>`;
         return;
       }
-      if (!displayName) {
-        setEditNameMessage("名稱不能空白。", "error");
-        return;
-      }
-      if (displayName.length > 50) {
-        setEditNameMessage("名稱最多 50 個字元。", "error");
-        return;
-      }
 
-      submitEditNameBtn.disabled = true;
-      cancelEditNameBtn.disabled = true;
-      setEditNameMessage("正在修改名稱…");
+      currentChildren =
+        Array.isArray(data)
+          ? data
+          : [];
 
-      try {
-        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-        if (sessionError || !session?.access_token) {
-          throw new Error("登入狀態已失效，請重新登入管理中心。");
-        }
-
-        const response = await fetch(HAWKVISION_ADMIN_API + "/update-display-name", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + session.access_token
-          },
-          body: JSON.stringify({
-            target_user_id: editNameUserId,
-            display_name: displayName
-          })
-        });
-
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || !result.ok) {
-          throw new Error(result.error || "修改名稱失敗。");
-        }
-
-        setEditNameMessage("名稱修改成功。", "success");
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (user) await loadDashboard(user);
-      } catch (error) {
-        setEditNameMessage("修改失敗：" + (error.message || String(error)), "error");
-      } finally {
-        submitEditNameBtn.disabled = false;
-        cancelEditNameBtn.disabled = false;
-      }
+      renderChildren();
     }
 
-    document.getElementById("accountTableBody").addEventListener("click", event => {
-      const btn = event.target.closest(".edit-name-btn");
-      if (!btn) return;
-      openEditName(btn.dataset.userId, btn.dataset.email, btn.dataset.name);
-    });
-
-    editMyNameBtn.addEventListener("click", () => {
-      const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
-      if (!me) return;
-      openEditName(me.user_id || me.id, me.email || "", me.display_name || "");
-    });
-
-    cancelEditNameBtn.addEventListener("click", closeEditName);
-    submitEditNameBtn.addEventListener("click", submitEditName);
-
-    // v1.5.0：本人與直屬下線密碼管理
-    const resetPasswordPanel = document.getElementById("resetPasswordPanel");
-    const resetPasswordTarget = document.getElementById("resetPasswordTarget");
-    const resetPasswordInput = document.getElementById("resetPasswordInput");
-    const resetPasswordConfirm = document.getElementById("resetPasswordConfirm");
-    const resetPasswordMessage = document.getElementById("resetPasswordMessage");
-    const cancelResetPasswordBtn = document.getElementById("cancelResetPasswordBtn");
-    const submitResetPasswordBtn = document.getElementById("submitResetPasswordBtn");
-    let resetPasswordUserId = null;
-
-    function setResetPasswordMessage(message = "", type = "") {
-      resetPasswordMessage.textContent = message;
-      resetPasswordMessage.className = "form-message" + (type ? " " + type : "");
-    }
-
-    function closeResetPassword() {
-      resetPasswordPanel.style.display = "none";
-      resetPasswordUserId = null;
-      resetPasswordInput.value = "";
-      resetPasswordConfirm.value = "";
-      setResetPasswordMessage();
-    }
-
-    function openResetPassword(userId, email, displayName) {
-      resetPasswordUserId = userId;
-      resetPasswordTarget.textContent = `目標帳號：${displayName || "未命名"}｜${email || userId}`;
-      resetPasswordInput.value = "";
-      resetPasswordConfirm.value = "";
-      setResetPasswordMessage();
-      resetPasswordPanel.style.display = "block";
-      resetPasswordPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-      resetPasswordInput.focus();
-    }
-
-    async function resetAccountPassword() {
-      const password = resetPasswordInput.value;
-      const confirmPassword = resetPasswordConfirm.value;
-
-      if (!resetPasswordUserId) {
-        setResetPasswordMessage("請重新選擇要重設密碼的帳號。", "error");
-        return;
-      }
-      if (password.length < 8) {
-        setResetPasswordMessage("新密碼至少需要 8 個字元。", "error");
-        return;
-      }
-      if (password !== confirmPassword) {
-        setResetPasswordMessage("兩次輸入的密碼不一致。", "error");
-        return;
-      }
-
-      submitResetPasswordBtn.disabled = true;
-      cancelResetPasswordBtn.disabled = true;
-      setResetPasswordMessage("正在重設密碼…");
-
-      try {
-        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-        if (sessionError || !session?.access_token) {
-          throw new Error("登入狀態已失效，請重新登入管理中心。");
-        }
-
-        const response = await fetch(HAWKVISION_ADMIN_API + "/reset-password", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + session.access_token
-          },
-          body: JSON.stringify({
-            target_user_id: resetPasswordUserId,
-            new_password: password
-          })
-        });
-
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || !result.ok) {
-          throw new Error(result.error || "重設密碼失敗。");
-        }
-
-        setResetPasswordMessage("密碼重設成功。", "success");
-        resetPasswordInput.value = "";
-        resetPasswordConfirm.value = "";
-      } catch (error) {
-        setResetPasswordMessage("重設失敗：" + (error.message || String(error)), "error");
-      } finally {
-        submitResetPasswordBtn.disabled = false;
-        cancelResetPasswordBtn.disabled = false;
-      }
-    }
-
-    document.getElementById("accountTableBody").addEventListener("click", event => {
-      const btn = event.target.closest(".reset-password-btn");
-      if (!btn) return;
-      openResetPassword(btn.dataset.userId, btn.dataset.email, btn.dataset.name);
-    });
-    cancelResetPasswordBtn.addEventListener("click", closeResetPassword);
-    editMyNameBtn.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
-      if (me) openInlineNameEditor(me.user_id || me.id, me.display_name || "");
-    }, true);
-
-    changeMyPasswordBtn.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
-      if (me) openInlinePasswordEditor(me.user_id || me.id);
-    }, true);
-
-    changeMyPasswordBtn.addEventListener("click", () => {
-      const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
-      if (!me) return;
-      openResetPassword(me.user_id || me.id, me.email || "", me.display_name || "");
-    });
-    submitResetPasswordBtn.addEventListener("click", resetAccountPassword);
-
-    const quotaTarget = document.getElementById("quotaTarget");
-      if (quotaTarget) {
-        const selected = quotaTarget.value;
-        const candidates = accountRows.filter(a => a.is_enabled && String(a.parent_id || "") === String(currentAuthUserId || ""));
-        quotaTarget.innerHTML = '<option value="">請選擇帳號</option>' + candidates.map(a =>
-          `<option value="${escapeHtml(a.user_id || a.id || "")}">${escapeHtml(a.display_name || a.email || "未命名")}｜${escapeHtml(a.email || "")}｜目前額度 ${escapeHtml(a.system_quota ?? 0)}</option>`
-        ).join("");
-        if ([...quotaTarget.options].some(o => o.value === selected)) quotaTarget.value = selected;
-      }
-      if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="empty-row">沒有符合的帳號</td></tr>'; return; }
-      body.innerHTML = rows.map(a => `
-        <tr>
-          <td>${escapeHtml(a.display_name || "—")}</td>
-          <td>${escapeHtml(a.email || "—")}</td>
-          <td><span class="role-badge">${escapeHtml(a.role_name || a.business_role || "—")}</span></td>
-          <td>${escapeHtml(a.role_level ?? "—")}</td>
-          <td><span class="status-badge ${a.is_enabled ? "status-on" : "status-off"}">${a.is_enabled ? "啟用" : "停用"}</span></td>
-          <td>${a.can_create_downline ? "是" : "否"}</td>
-          <td>${a.is_platform_owner ? '<span class="status-badge owner-badge">是</span>' : "否"}</td>
-          <td><div class="account-actions">
-            <button class="account-action-btn name-btn edit-name-btn" type="button" data-user-id="${escapeHtml(a.user_id || a.id || "")}" data-email="${escapeHtml(a.email || "")}" data-name="${escapeHtml(a.display_name || "")}">修改名稱</button>
-            <button class="account-action-btn reset-password-btn" type="button" data-user-id="${escapeHtml(a.user_id || a.id || "")}" data-email="${escapeHtml(a.email || "")}" data-name="${escapeHtml(a.display_name || "")}">${String(a.user_id || a.id || "") === String(currentAuthUserId || "") ? "修改密碼" : "重設密碼"}</button>
-          </div></td>
-        </tr>`).join("");
-    }
-
-    async function loadAccounts() {
-      const { data, error } = await supabaseClient.rpc("hv_admin_list_accounts");
-      if (error) throw error;
-
-      // v1.4.3：system_quota 直接由安全的 hv_admin_list_accounts RPC 回傳。
-      // 不再由前端直接讀取 hv_business_accounts，避免 RLS 導致顯示 0。
-      accountRows = Array.isArray(data) ? data : (data ? [data] : []);
-
-      renderAccounts();
-    }
-
-    async function loadDashboard(user) {
-      dashboardError.textContent = "";
-      dashboardError.style.display = "none";
-
-      currentAuthUserId = user.id || null;
-
-      document.getElementById("currentUser").textContent =
-        user.email || user.id;
-
-      const { data, error } =
+    async function refreshStats() {
+      const {
+        data,
+        error
+      } =
         await supabaseClient.rpc(
           "hv_admin_dashboard_stats"
         );
 
       if (error) {
-        await supabaseClient.auth.signOut();
-
-        showLogin();
-
-        showLoginError(
-          "無法進入管理中心：" + error.message
-        );
-
-        return;
+        throw error;
       }
 
       const stats =
-        Array.isArray(data) ? data[0] : data;
+        Array.isArray(data)
+          ? data[0]
+          : data;
 
-      if (!stats) {
-        dashboardError.textContent =
-          "沒有取得平台總覽資料。";
+      document.getElementById(
+        "platformMax"
+      ).textContent =
+        formatNumber(
+          stats?.platform_max
+        );
 
-        dashboardError.style.display = "block";
+      document.getElementById(
+        "currentAccounts"
+      ).textContent =
+        formatNumber(
+          stats?.current_accounts
+        );
 
-        showDashboard();
+      document.getElementById(
+        "allocatedQuota"
+      ).textContent =
+        formatNumber(
+          stats?.allocated_quota
+        );
 
+      document.getElementById(
+        "availableQuota"
+      ).textContent =
+        formatNumber(
+          stats?.available_quota
+        );
+    }
+
+    async function loadDashboard(user) {
+      currentUser = user;
+
+      const {
+        data,
+        error
+      } =
+        await supabaseClient.rpc(
+          "hv_admin_current_account"
+        );
+
+      if (error || !data) {
+        await supabaseClient.auth.signOut();
+        showLogin();
+        showLoginError(
+          "無法進入管理中心：" +
+          (
+            error?.message ||
+            "找不到管理帳號資料"
+          )
+        );
         return;
       }
 
-      document.getElementById("platformMax").textContent =
-        formatNumber(stats.platform_max);
+      currentAccount = data;
 
-      document.getElementById("currentAccounts").textContent =
-        formatNumber(stats.current_accounts);
+      document.getElementById(
+        "currentName"
+      ).textContent =
+        currentAccount.display_name ||
+        currentAccount.account ||
+        "—";
 
-      document.getElementById("allocatedQuota").textContent =
-        formatNumber(stats.allocated_quota);
+      document.getElementById(
+        "currentRole"
+      ).textContent =
+        "｜" +
+        (
+          currentAccount.role_name ||
+          ROLE_LABELS[
+            currentAccount.business_role
+          ] ||
+          ""
+        );
 
-      document.getElementById("availableQuota").textContent =
-        formatNumber(stats.available_quota);
+      populateRoleOptions();
+      await refreshStats();
 
-      try {
-        await loadAccounts();
-      } catch (accountError) {
-        dashboardError.textContent = "帳號清單載入失敗：" + (accountError.message || String(accountError));
-        dashboardError.style.display = "block";
-      }
+      contextStack = [
+        {
+          ...currentAccount,
+          role_name:
+            currentAccount.role_name ||
+            ROLE_LABELS[
+              currentAccount.business_role
+            ]
+        }
+      ];
 
       showDashboard();
+
+      await loadChildren(
+        contextStack[0]
+      );
     }
 
     async function login() {
       clearLoginError();
 
-      const email =
-        document.getElementById("email")
-          .value
-          .trim();
-
-      const password =
-        document.getElementById("password")
-          .value;
-
-      if (!email || !password) {
-        showLoginError(
-          "請輸入 Email 與密碼。"
+      const account =
+        normalizeLoginAccount(
+          document.getElementById(
+            "loginAccount"
+          ).value
         );
 
+      const password =
+        document.getElementById(
+          "loginPassword"
+        ).value;
+
+      if (!account || !password) {
+        showLoginError(
+          "請輸入帳號與密碼"
+        );
         return;
       }
 
-      loginLoading.style.display = "block";
-      loginBtn.disabled = true;
-
-      try {
-        const { data, error } =
-          await supabaseClient.auth.signInWithPassword({
-            email: email,
-            password: password
-          });
-
-        if (error) {
-          showLoginError(
-            "登入失敗：" + error.message
-          );
-
-          return;
-        }
-
-        if (!data.user) {
-          showLoginError(
-            "登入成功，但沒有取得使用者資料。"
-          );
-
-          return;
-        }
-
-        await loadDashboard(data.user);
-
-      } catch (error) {
-
-        showLoginError(
-          "登入發生錯誤：" +
-          (error.message || String(error))
+      const button =
+        document.getElementById(
+          "loginBtn"
         );
 
+      document.getElementById(
+        "loginLoading"
+      ).style.display = "block";
+
+      button.disabled = true;
+
+      try {
+        const {
+          data,
+          error
+        } =
+          await supabaseClient.auth
+            .signInWithPassword({
+              email: account,
+              password
+            });
+
+        if (error) {
+          throw error;
+        }
+
+        await loadDashboard(
+          data.user
+        );
+      } catch (error) {
+        showLoginError(
+          "登入失敗：" +
+          (
+            error.message ||
+            String(error)
+          )
+        );
       } finally {
+        document.getElementById(
+          "loginLoading"
+        ).style.display = "none";
 
-        loginLoading.style.display = "none";
-        loginBtn.disabled = false;
-
+        button.disabled = false;
       }
     }
 
-
-    const createAccountPanel = document.getElementById("createAccountPanel");
-    const openCreateAccountBtn = document.getElementById("openCreateAccountBtn");
-    const cancelCreateAccountBtn = document.getElementById("cancelCreateAccountBtn");
-    const submitCreateAccountBtn = document.getElementById("submitCreateAccountBtn");
-    const createAccountMessage = document.getElementById("createAccountMessage");
-
-    function setCreateMessage(message = "", type = "") {
-      createAccountMessage.textContent = message;
-      createAccountMessage.className = "form-message" + (type ? " " + type : "");
-    }
-
-    function resetCreateAccountForm() {
-      document.getElementById("newDisplayName").value = "";
-      document.getElementById("newEmail").value = "";
-      document.getElementById("newPassword").value = "";
-      document.getElementById("newBusinessRole").value = "";
-      setCreateMessage();
-    }
-
-    function openCreateAccount() {
-      resetCreateAccountForm();
-      createAccountPanel.style.display = "block";
-      createAccountPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-
-    function closeCreateAccount() {
-      createAccountPanel.style.display = "none";
-      resetCreateAccountForm();
-    }
-
     async function createAccount() {
-      const displayName = document.getElementById("newDisplayName").value.trim();
-      const email = document.getElementById("newEmail").value.trim().toLowerCase();
-      const password = document.getElementById("newPassword").value;
-      const businessRole = document.getElementById("newBusinessRole").value;
+      const displayName =
+        document.getElementById(
+          "newDisplayName"
+        ).value.trim();
 
-      if (!displayName || !email || !password || !businessRole) {
-        setCreateMessage("請完整填寫名稱、Email、密碼與商業層級。", "error");
+      const account =
+        document.getElementById(
+          "newAccount"
+        ).value.trim();
+
+      const password =
+        document.getElementById(
+          "newPassword"
+        ).value;
+
+      const role =
+        document.getElementById(
+          "newRole"
+        ).value;
+
+      const initialQuota =
+        role === "member"
+          ? 0
+          : Number(
+              document.getElementById(
+                "initialQuota"
+              ).value || 0
+            );
+
+      if (
+        !displayName ||
+        !account ||
+        !password ||
+        !role
+      ) {
+        showPageStatus(
+          "建立失敗：請完整填寫資料",
+          "error"
+        );
         return;
       }
 
       if (password.length < 8) {
-        setCreateMessage("密碼至少需要 8 個字元。", "error");
+        showPageStatus(
+          "建立失敗：密碼至少需要 8 個字元",
+          "error"
+        );
         return;
       }
 
-      submitCreateAccountBtn.disabled = true;
-      cancelCreateAccountBtn.disabled = true;
-      setCreateMessage("正在建立帳號…");
+      if (
+        !Number.isInteger(
+          initialQuota
+        ) ||
+        initialQuota < 0
+      ) {
+        showPageStatus(
+          "建立失敗：初始額度必須是 0 以上的整數",
+          "error"
+        );
+        return;
+      }
 
-      try {
-        const { data: { session }, error: sessionError } =
-          await supabaseClient.auth.getSession();
-
-        if (sessionError || !session?.access_token) {
-          throw new Error("登入狀態已失效，請重新登入管理中心。");
-        }
-
-        const response = await fetch(
-          HAWKVISION_ADMIN_API + "/create-account",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": "Bearer " + session.access_token
-            },
-            body: JSON.stringify({
-              email: email,
-              password: password,
-              display_name: displayName,
-              business_role: businessRole
-            })
-          }
+      const submit =
+        document.getElementById(
+          "submitCreateBtn"
         );
 
-        const result = await response.json().catch(() => ({}));
+      const cancel =
+        document.getElementById(
+          "cancelCreateBtn"
+        );
 
-        if (!response.ok || !result.ok) {
-          throw new Error(result.error || "建立帳號失敗。");
+      submit.disabled = true;
+      cancel.disabled = true;
+
+      try {
+        const token =
+          await getSessionToken();
+
+        const response =
+          await fetch(
+            HAWKVISION_ADMIN_API +
+            "/create-account",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+                "Authorization":
+                  "Bearer " + token
+              },
+              body: JSON.stringify({
+                account,
+                password,
+                display_name:
+                  displayName,
+                business_role:
+                  role,
+                initial_quota:
+                  initialQuota
+              })
+            }
+          );
+
+        const result =
+          await response
+            .json()
+            .catch(() => ({}));
+
+        if (
+          !response.ok ||
+          !result.ok
+        ) {
+          throw new Error(
+            result.error ||
+            "建立帳號失敗"
+          );
         }
 
-        setCreateMessage("帳號建立成功。", "success");
-        document.getElementById("newDisplayName").value = "";
-        document.getElementById("newEmail").value = "";
-        document.getElementById("newPassword").value = "";
-        document.getElementById("newBusinessRole").value = "";
+        closeCreatePanel();
 
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (user) {
-          await loadDashboard(user);
-        } else {
-          await loadAccounts();
-        }
+        showPageStatus(
+          role === "member"
+            ? "✓ 會員帳號建立成功"
+            : `✓ 帳號建立成功${
+                initialQuota > 0
+                  ? `，已分配額度 ${initialQuota}`
+                  : ""
+              }`
+        );
+
+        await refreshStats();
+
+        await loadChildren(
+          contextStack[0]
+        );
       } catch (error) {
-        setCreateMessage(
-          "建立失敗：" + (error.message || String(error)),
+        showPageStatus(
+          "建立失敗：" +
+          (
+            error.message ||
+            String(error)
+          ),
           "error"
         );
       } finally {
-        submitCreateAccountBtn.disabled = false;
-        cancelCreateAccountBtn.disabled = false;
+        submit.disabled = false;
+        cancel.disabled = false;
       }
     }
 
-    const quotaTarget = document.getElementById("quotaTarget");
-    const quotaAmount = document.getElementById("quotaAmount");
-    const quotaReason = document.getElementById("quotaReason");
-    const quotaMessage = document.getElementById("quotaMessage");
-    const allocateQuotaBtn = document.getElementById("allocateQuotaBtn");
-    const reclaimQuotaBtn = document.getElementById("reclaimQuotaBtn");
+    function openSelfName() {
+      const panel =
+        document.getElementById(
+          "selfPanel"
+        );
 
-    function setQuotaMessage(message = "", type = "") {
-      quotaMessage.textContent = message;
-      quotaMessage.className = "form-message" + (type ? " " + type : "");
+      panel.style.display = "block";
+
+      panel.innerHTML = `
+        <strong>修改我的名稱</strong>
+
+        <div class="grid">
+          <div>
+            <label>新名稱</label>
+            <input
+              class="self-name-input"
+              type="text"
+              maxlength="50"
+              value="${escapeHtml(currentAccount.display_name || "")}"
+            />
+          </div>
+        </div>
+
+        <div class="panel-actions">
+          <button class="secondary self-close" type="button">
+            取消
+          </button>
+          <button class="primary self-submit-name" type="button">
+            確認修改
+          </button>
+        </div>
+      `;
+
+      panel.querySelector(
+        ".self-close"
+      ).addEventListener(
+        "click",
+        () => {
+          panel.style.display =
+            "none";
+          panel.innerHTML = "";
+        }
+      );
+
+      panel.querySelector(
+        ".self-submit-name"
+      ).addEventListener(
+        "click",
+        async event => {
+          const value =
+            panel.querySelector(
+              ".self-name-input"
+            ).value.trim();
+
+          if (!value) {
+            showPageStatus(
+              "修改失敗：名稱不能空白",
+              "error"
+            );
+            return;
+          }
+
+          event.currentTarget.disabled =
+            true;
+
+          try {
+            const token =
+              await getSessionToken();
+
+            const response =
+              await fetch(
+                HAWKVISION_ADMIN_API +
+                "/update-display-name",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                    "Authorization":
+                      "Bearer " + token
+                  },
+                  body: JSON.stringify({
+                    target_user_id:
+                      currentUser.id,
+                    display_name:
+                      value
+                  })
+                }
+              );
+
+            const result =
+              await response
+                .json()
+                .catch(() => ({}));
+
+            if (
+              !response.ok ||
+              !result.ok
+            ) {
+              throw new Error(
+                result.error ||
+                "修改名稱失敗"
+              );
+            }
+
+            currentAccount.display_name =
+              value;
+
+            document.getElementById(
+              "currentName"
+            ).textContent = value;
+
+            panel.style.display =
+              "none";
+            panel.innerHTML = "";
+
+            showPageStatus(
+              "✓ 名稱修改成功"
+            );
+          } catch (error) {
+            showPageStatus(
+              "修改失敗：" +
+              (
+                error.message ||
+                String(error)
+              ),
+              "error"
+            );
+          }
+        }
+      );
     }
 
-    async function submitQuotaAction(action) {
-      const targetUserId = quotaTarget.value;
-      const amount = Number(quotaAmount.value);
-      const reason = quotaReason.value.trim() || null;
-      if (!targetUserId) { setQuotaMessage("請先選擇目標帳號。", "error"); return; }
-      if (!Number.isInteger(amount) || amount <= 0) { setQuotaMessage("額度數量必須是大於 0 的整數。", "error"); return; }
+    function openSelfPassword() {
+      const panel =
+        document.getElementById(
+          "selfPanel"
+        );
 
-      allocateQuotaBtn.disabled = true;
-      reclaimQuotaBtn.disabled = true;
-      setQuotaMessage(action === "allocate" ? "正在分配額度…" : "正在收回額度…");
-      try {
-        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-        if (sessionError || !session?.access_token) throw new Error("登入狀態已失效，請重新登入管理中心。");
-        const response = await fetch(HAWKVISION_ADMIN_API + (action === "allocate" ? "/allocate-quota" : "/reclaim-quota"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
-          body: JSON.stringify({ target_user_id: targetUserId, amount, reason })
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || !result.ok) throw new Error(result.error || "額度操作失敗。");
-        const r = result.result || {};
-        setQuotaMessage(`${action === "allocate" ? "分配" : "收回"}成功：${r.quota_before ?? "—"} → ${r.quota_after ?? "—"}；你的剩餘額度 ${r.actor_remaining ?? r.actor_remaining_quota ?? "—"}。`, "success");
-        quotaAmount.value = "";
-        quotaReason.value = "";
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        if (user) await loadDashboard(user);
-      } catch (error) {
-        setQuotaMessage("操作失敗：" + (error.message || String(error)), "error");
-      } finally {
-        allocateQuotaBtn.disabled = false;
-        reclaimQuotaBtn.disabled = false;
+      panel.style.display = "block";
+
+      panel.innerHTML = `
+        <strong>修改我的密碼</strong>
+
+        <div class="grid">
+          <div>
+            <label>新密碼</label>
+            <input class="self-pass1" type="password" autocomplete="new-password" />
+          </div>
+
+          <div>
+            <label>再次輸入新密碼</label>
+            <input class="self-pass2" type="password" autocomplete="new-password" />
+          </div>
+        </div>
+
+        <div class="panel-actions">
+          <button class="secondary self-close" type="button">
+            取消
+          </button>
+          <button class="primary self-submit-password" type="button">
+            確認修改
+          </button>
+        </div>
+      `;
+
+      panel.querySelector(
+        ".self-close"
+      ).addEventListener(
+        "click",
+        () => {
+          panel.style.display =
+            "none";
+          panel.innerHTML = "";
+        }
+      );
+
+      panel.querySelector(
+        ".self-submit-password"
+      ).addEventListener(
+        "click",
+        async event => {
+          const p1 =
+            panel.querySelector(
+              ".self-pass1"
+            ).value;
+
+          const p2 =
+            panel.querySelector(
+              ".self-pass2"
+            ).value;
+
+          if (p1.length < 8) {
+            showPageStatus(
+              "修改失敗：密碼至少需要 8 個字元",
+              "error"
+            );
+            return;
+          }
+
+          if (p1 !== p2) {
+            showPageStatus(
+              "修改失敗：兩次輸入的密碼不一致",
+              "error"
+            );
+            return;
+          }
+
+          event.currentTarget.disabled =
+            true;
+
+          try {
+            const token =
+              await getSessionToken();
+
+            const response =
+              await fetch(
+                HAWKVISION_ADMIN_API +
+                "/reset-password",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                    "Authorization":
+                      "Bearer " + token
+                  },
+                  body: JSON.stringify({
+                    target_user_id:
+                      currentUser.id,
+                    new_password:
+                      p1
+                  })
+                }
+              );
+
+            const result =
+              await response
+                .json()
+                .catch(() => ({}));
+
+            if (
+              !response.ok ||
+              !result.ok
+            ) {
+              throw new Error(
+                result.error ||
+                "修改密碼失敗"
+              );
+            }
+
+            panel.style.display =
+              "none";
+            panel.innerHTML = "";
+
+            showPageStatus(
+              "✓ 密碼修改成功，請重新登入"
+            );
+
+            setTimeout(
+              async () => {
+                await supabaseClient.auth
+                  .signOut();
+
+                showLogin();
+              },
+              3000
+            );
+          } catch (error) {
+            showPageStatus(
+              "修改失敗：" +
+              (
+                error.message ||
+                String(error)
+              ),
+              "error"
+            );
+          }
+        }
+      );
+    }
+
+    document.getElementById(
+      "newRole"
+    ).addEventListener(
+      "change",
+      event => {
+        const isMember =
+          event.target.value ===
+          "member";
+
+        document.getElementById(
+          "initialQuotaWrap"
+        ).style.display =
+          isMember
+            ? "none"
+            : "block";
+
+        if (isMember) {
+          document.getElementById(
+            "initialQuota"
+          ).value = "0";
+        }
       }
-    }
+    );
 
-    allocateQuotaBtn.addEventListener("click", () => submitQuotaAction("allocate"));
-    reclaimQuotaBtn.addEventListener("click", () => submitQuotaAction("reclaim"));
-
-    openCreateAccountBtn.addEventListener("click", openCreateAccount);
-    cancelCreateAccountBtn.addEventListener("click", closeCreateAccount);
-    submitCreateAccountBtn.addEventListener("click", createAccount);
-
-    loginBtn.addEventListener(
+    document.getElementById(
+      "loginBtn"
+    ).addEventListener(
       "click",
       login
     );
 
-    document
-      .getElementById("password")
-      .addEventListener(
-        "keydown",
-        function (event) {
-          if (event.key === "Enter") {
-            login();
-          }
+    document.getElementById(
+      "loginPassword"
+    ).addEventListener(
+      "keydown",
+      event => {
+        if (event.key === "Enter") {
+          login();
         }
-      );
+      }
+    );
 
-      logoutBtn.addEventListener(
+    document.getElementById(
+      "logoutBtn"
+    ).addEventListener(
       "click",
       async () => {
+        await supabaseClient.auth
+          .signOut();
 
-        await supabaseClient.auth.signOut();
-        currentAuthUserId = null;
+        currentUser = null;
+        currentAccount = null;
+        currentChildren = [];
+        contextStack = [];
 
-        document.getElementById("email").value = "";
-        document.getElementById("password").value = "";
+        document.getElementById(
+          "loginAccount"
+        ).value = "";
 
-        clearLoginError();
+        document.getElementById(
+          "loginPassword"
+        ).value = "";
 
         showLogin();
       }
     );
 
-    document.getElementById("accountSearch").addEventListener("input", renderAccounts);
+    document.getElementById(
+      "editMyNameBtn"
+    ).addEventListener(
+      "click",
+      openSelfName
+    );
+
+    document.getElementById(
+      "editMyPasswordBtn"
+    ).addEventListener(
+      "click",
+      openSelfPassword
+    );
+
+    document.getElementById(
+      "openCreateBtn"
+    ).addEventListener(
+      "click",
+      openCreatePanel
+    );
+
+    document.getElementById(
+      "cancelCreateBtn"
+    ).addEventListener(
+      "click",
+      closeCreatePanel
+    );
+
+    document.getElementById(
+      "submitCreateBtn"
+    ).addEventListener(
+      "click",
+      createAccount
+    );
+
+    document.getElementById(
+      "accountSearch"
+    ).addEventListener(
+      "input",
+      renderChildren
+    );
+
+    document.getElementById(
+      "backLevelBtn"
+    ).addEventListener(
+      "click",
+      async () => {
+        if (
+          contextStack.length <= 1
+        ) {
+          return;
+        }
+
+        contextStack.pop();
+
+        await loadChildren(
+          contextStack[
+            contextStack.length - 1
+          ]
+        );
+      }
+    );
 
     async function restoreSession() {
       try {
@@ -1276,26 +2373,26 @@
           data: { session },
           error
         } =
-          await supabaseClient.auth.getSession();
+          await supabaseClient.auth
+            .getSession();
 
-        if (error) {
+        if (
+          error ||
+          !session?.user
+        ) {
           showLogin();
           return;
         }
 
-        if (session && session.user) {
-          await loadDashboard(session.user);
-        } else {
-          showLogin();
-        }
-
-      } catch (error) {
+        await loadDashboard(
+          session.user
+        );
+      } catch {
         showLogin();
       }
     }
 
     restoreSession();
   </script>
-
 </body>
 </html>
