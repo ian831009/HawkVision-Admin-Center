@@ -251,7 +251,7 @@
     </div>
 
     <div class="version">
-      Admin Center v1.4.0
+      Admin Center v1.4.1
     </div>
   </header>
 
@@ -474,6 +474,7 @@
     }
 
     let accountRows = [];
+    let currentAuthUserId = null;
 
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
@@ -488,7 +489,7 @@
       const quotaTarget = document.getElementById("quotaTarget");
       if (quotaTarget) {
         const selected = quotaTarget.value;
-        const candidates = accountRows.filter(a => !a.is_platform_owner && a.is_enabled);
+        const candidates = accountRows.filter(a => a.is_enabled && String(a.parent_id || "") === String(currentAuthUserId || ""));
         quotaTarget.innerHTML = '<option value="">請選擇帳號</option>' + candidates.map(a =>
           `<option value="${escapeHtml(a.user_id || a.id || "")}">${escapeHtml(a.display_name || a.email || "未命名")}｜${escapeHtml(a.email || "")}｜目前額度 ${escapeHtml(a.system_quota ?? 0)}</option>`
         ).join("");
@@ -517,6 +518,8 @@
     async function loadDashboard(user) {
       dashboardError.textContent = "";
       dashboardError.style.display = "none";
+
+      currentAuthUserId = user.id || null;
 
       document.getElementById("currentUser").textContent =
         user.email || user.id;
@@ -816,6 +819,7 @@
       async () => {
 
         await supabaseClient.auth.signOut();
+        currentAuthUserId = null;
 
         document.getElementById("email").value = "";
         document.getElementById("password").value = "";
