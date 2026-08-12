@@ -209,6 +209,9 @@
     .form-message { display:none; margin-top:14px; padding:12px; border-radius:10px; }
     .form-message.success { display:block; background:#dcfce7; color:#166534; }
     .form-message.error { display:block; background:#fee2e2; color:#991b1b; }
+    .account-action-btn { background:#eef2ff; color:#3730a3; padding:8px 11px; font-size:13px; white-space:nowrap; }
+    .reset-panel { display:none; margin:0 0 20px; padding:20px; border:1px solid #c7d2fe; border-radius:14px; background:#f8faff; }
+    .reset-target { margin:6px 0 4px; color:#475569; font-size:14px; }
 
     @media (max-width: 850px) {
       .cards {
@@ -251,7 +254,7 @@
     </div>
 
     <div class="version">
-      Admin Center v1.4.3
+      Admin Center v1.4.4
     </div>
   </header>
 
@@ -369,6 +372,20 @@
           </div>
         </div>
 
+        <div id="resetPasswordPanel" class="reset-panel">
+          <h3 style="margin-top:0;">重設帳號密碼</h3>
+          <div id="resetPasswordTarget" class="reset-target">—</div>
+          <label for="resetPasswordInput">新密碼</label>
+          <input id="resetPasswordInput" type="password" autocomplete="new-password" placeholder="至少 8 個字元" />
+          <label for="resetPasswordConfirm">再次輸入新密碼</label>
+          <input id="resetPasswordConfirm" type="password" autocomplete="new-password" placeholder="再次輸入新密碼" />
+          <div id="resetPasswordMessage" class="form-message"></div>
+          <div class="create-actions">
+            <button id="cancelResetPasswordBtn" class="secondary" type="button">取消</button>
+            <button id="submitResetPasswordBtn" class="primary" type="button">確認重設密碼</button>
+          </div>
+        </div>
+
         <div class="account-toolbar">
           <input id="accountSearch" type="search" placeholder="搜尋 Email、名稱或角色" />
           <div class="toolbar-actions">
@@ -378,8 +395,8 @@
         </div>
         <div class="table-wrap">
           <table class="account-table">
-            <thead><tr><th>名稱</th><th>Email</th><th>角色</th><th>層級</th><th>狀態</th><th>可建立下線</th><th>平台擁有者</th></tr></thead>
-            <tbody id="accountTableBody"><tr><td colspan="7" class="empty-row">載入中…</td></tr></tbody>
+            <thead><tr><th>名稱</th><th>Email</th><th>角色</th><th>層級</th><th>狀態</th><th>可建立下線</th><th>平台擁有者</th><th>帳號操作</th></tr></thead>
+            <tbody id="accountTableBody"><tr><td colspan="8" class="empty-row">載入中…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -486,7 +503,104 @@
       const q = document.getElementById("accountSearch").value.trim().toLowerCase();
       const rows = accountRows.filter(a => [a.display_name,a.email,a.role_name,a.business_role].some(v => String(v ?? "").toLowerCase().includes(q)));
       count.textContent = `顯示 ${rows.length} / ${accountRows.length} 個帳號`;
-      const quotaTarget = document.getElementById("quotaTarget");
+      // v1.4.4：帳號密碼管理
+    const resetPasswordPanel = document.getElementById("resetPasswordPanel");
+    const resetPasswordTarget = document.getElementById("resetPasswordTarget");
+    const resetPasswordInput = document.getElementById("resetPasswordInput");
+    const resetPasswordConfirm = document.getElementById("resetPasswordConfirm");
+    const resetPasswordMessage = document.getElementById("resetPasswordMessage");
+    const cancelResetPasswordBtn = document.getElementById("cancelResetPasswordBtn");
+    const submitResetPasswordBtn = document.getElementById("submitResetPasswordBtn");
+    let resetPasswordUserId = null;
+
+    function setResetPasswordMessage(message = "", type = "") {
+      resetPasswordMessage.textContent = message;
+      resetPasswordMessage.className = "form-message" + (type ? " " + type : "");
+    }
+
+    function closeResetPassword() {
+      resetPasswordPanel.style.display = "none";
+      resetPasswordUserId = null;
+      resetPasswordInput.value = "";
+      resetPasswordConfirm.value = "";
+      setResetPasswordMessage();
+    }
+
+    function openResetPassword(userId, email, displayName) {
+      resetPasswordUserId = userId;
+      resetPasswordTarget.textContent = `目標帳號：${displayName || "未命名"}｜${email || userId}`;
+      resetPasswordInput.value = "";
+      resetPasswordConfirm.value = "";
+      setResetPasswordMessage();
+      resetPasswordPanel.style.display = "block";
+      resetPasswordPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      resetPasswordInput.focus();
+    }
+
+    async function resetAccountPassword() {
+      const password = resetPasswordInput.value;
+      const confirmPassword = resetPasswordConfirm.value;
+
+      if (!resetPasswordUserId) {
+        setResetPasswordMessage("請重新選擇要重設密碼的帳號。", "error");
+        return;
+      }
+      if (password.length < 8) {
+        setResetPasswordMessage("新密碼至少需要 8 個字元。", "error");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setResetPasswordMessage("兩次輸入的密碼不一致。", "error");
+        return;
+      }
+
+      submitResetPasswordBtn.disabled = true;
+      cancelResetPasswordBtn.disabled = true;
+      setResetPasswordMessage("正在重設密碼…");
+
+      try {
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+        if (sessionError || !session?.access_token) {
+          throw new Error("登入狀態已失效，請重新登入管理中心。");
+        }
+
+        const response = await fetch(HAWKVISION_ADMIN_API + "/reset-password", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + session.access_token
+          },
+          body: JSON.stringify({
+            target_user_id: resetPasswordUserId,
+            new_password: password
+          })
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.ok) {
+          throw new Error(result.error || "重設密碼失敗。");
+        }
+
+        setResetPasswordMessage("密碼重設成功。", "success");
+        resetPasswordInput.value = "";
+        resetPasswordConfirm.value = "";
+      } catch (error) {
+        setResetPasswordMessage("重設失敗：" + (error.message || String(error)), "error");
+      } finally {
+        submitResetPasswordBtn.disabled = false;
+        cancelResetPasswordBtn.disabled = false;
+      }
+    }
+
+    document.getElementById("accountTableBody").addEventListener("click", event => {
+      const btn = event.target.closest(".reset-password-btn");
+      if (!btn) return;
+      openResetPassword(btn.dataset.userId, btn.dataset.email, btn.dataset.name);
+    });
+    cancelResetPasswordBtn.addEventListener("click", closeResetPassword);
+    submitResetPasswordBtn.addEventListener("click", resetAccountPassword);
+
+    const quotaTarget = document.getElementById("quotaTarget");
       if (quotaTarget) {
         const selected = quotaTarget.value;
         const candidates = accountRows.filter(a => a.is_enabled && String(a.parent_id || "") === String(currentAuthUserId || ""));
@@ -495,7 +609,7 @@
         ).join("");
         if ([...quotaTarget.options].some(o => o.value === selected)) quotaTarget.value = selected;
       }
-      if (!rows.length) { body.innerHTML = '<tr><td colspan="7" class="empty-row">沒有符合的帳號</td></tr>'; return; }
+      if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="empty-row">沒有符合的帳號</td></tr>'; return; }
       body.innerHTML = rows.map(a => `
         <tr>
           <td>${escapeHtml(a.display_name || "—")}</td>
@@ -505,6 +619,7 @@
           <td><span class="status-badge ${a.is_enabled ? "status-on" : "status-off"}">${a.is_enabled ? "啟用" : "停用"}</span></td>
           <td>${a.can_create_downline ? "是" : "否"}</td>
           <td>${a.is_platform_owner ? '<span class="status-badge owner-badge">是</span>' : "否"}</td>
+          <td>${String(a.user_id || a.id || "") === String(currentAuthUserId || "") ? "—" : `<button class="account-action-btn reset-password-btn" type="button" data-user-id="${escapeHtml(a.user_id || a.id || "")}" data-email="${escapeHtml(a.email || "")}" data-name="${escapeHtml(a.display_name || "")}">重設密碼</button>`}</td>
         </tr>`).join("");
     }
 
