@@ -251,7 +251,7 @@
     </div>
 
     <div class="version">
-      Admin Center v1.4.1
+      Admin Center v1.4.2
     </div>
   </header>
 
@@ -511,7 +511,28 @@
     async function loadAccounts() {
       const { data, error } = await supabaseClient.rpc("hv_admin_list_accounts");
       if (error) throw error;
+
       accountRows = Array.isArray(data) ? data : (data ? [data] : []);
+
+      // v1.4.2：帳號清單 RPC 沒有帶 system_quota 時，
+      // 另外讀取商業帳號的實際額度並合併，避免下拉選單永遠顯示 0。
+      const { data: quotaRows, error: quotaError } = await supabaseClient
+        .from("hv_business_accounts")
+        .select("user_id, system_quota");
+
+      if (!quotaError && Array.isArray(quotaRows)) {
+        const quotaByUserId = new Map(
+          quotaRows.map(row => [String(row.user_id), row.system_quota])
+        );
+
+        accountRows = accountRows.map(account => {
+          const userId = String(account.user_id || account.id || "");
+          return quotaByUserId.has(userId)
+            ? { ...account, system_quota: quotaByUserId.get(userId) }
+            : account;
+        });
+      }
+
       renderAccounts();
     }
 
