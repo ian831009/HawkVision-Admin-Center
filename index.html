@@ -216,7 +216,16 @@
     .account-action-btn.name-btn { background:#ecfeff; color:#155e75; }
     .self-settings { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .self-settings button { width:auto; margin-top:0; }
-    .edit-name-panel { display:none; margin:0 0 20px; padding:20px; border:1px solid #bae6fd; border-radius:14px; background:#f7fdff; }
+    .edit-name-panel { display:none !important; }
+    .reset-panel { display:none !important; }
+    .inline-edit-row td { background:#f8fafc; padding:10px 14px !important; }
+    .inline-edit-box { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .inline-edit-box input { width:auto; min-width:180px; flex:1 1 180px; padding:9px 11px; font-size:14px; }
+    .inline-edit-box button { width:auto; margin:0; padding:9px 12px; }
+    .inline-edit-label { font-size:13px; font-weight:700; white-space:nowrap; }
+    .inline-status-row td { padding:8px 14px !important; font-size:13px; font-weight:700; }
+    .inline-status-row.success td { background:#dcfce7; color:#166534; }
+    .inline-status-row.error td { background:#fee2e2; color:#991b1b; }
 
     @media (max-width: 850px) {
       .cards {
@@ -259,7 +268,7 @@
     </div>
 
     <div class="version">
-      Admin Center v1.5.0
+      Admin Center v1.5.1
     </div>
   </header>
 
@@ -522,7 +531,174 @@
       const q = document.getElementById("accountSearch").value.trim().toLowerCase();
       const rows = accountRows.filter(a => [a.display_name,a.email,a.role_name,a.business_role].some(v => String(v ?? "").toLowerCase().includes(q)));
       count.textContent = `顯示 ${rows.length} / ${accountRows.length} 個帳號`;
-      // v1.5.0：本人與直屬下線名稱管理
+      // v1.5.1：帳號列下方的小型名稱／密碼編輯器
+    let inlineEditorRow = null;
+    let inlineStatusTimer = null;
+
+    function removeInlineEditor() {
+      if (inlineEditorRow) {
+        inlineEditorRow.remove();
+        inlineEditorRow = null;
+      }
+    }
+
+    function showInlineStatus(sourceRow, message, type = "success") {
+      document.querySelectorAll(".inline-status-row").forEach(row => row.remove());
+      if (inlineStatusTimer) clearTimeout(inlineStatusTimer);
+
+      const statusRow = document.createElement("tr");
+      statusRow.className = `inline-status-row ${type}`;
+      statusRow.innerHTML = `<td colspan="9">${escapeHtml(message)}</td>`;
+      sourceRow.insertAdjacentElement("afterend", statusRow);
+
+      inlineStatusTimer = setTimeout(() => {
+        statusRow.remove();
+      }, 3000);
+    }
+
+    function findAccountRow(userId) {
+      const button = document.querySelector(`.account-action-btn[data-user-id="${CSS.escape(String(userId))}"]`);
+      return button ? button.closest("tr") : null;
+    }
+
+    function openInlineNameEditor(userId, displayName) {
+      removeInlineEditor();
+      const sourceRow = findAccountRow(userId);
+      if (!sourceRow) return;
+
+      const row = document.createElement("tr");
+      row.className = "inline-edit-row";
+      row.innerHTML = `
+        <td colspan="9">
+          <div class="inline-edit-box">
+            <span class="inline-edit-label">修改名稱</span>
+            <input class="inline-name-input" type="text" maxlength="50" value="${escapeHtml(displayName || "")}" placeholder="請輸入新名稱">
+            <button class="primary inline-name-submit" type="button">確認</button>
+            <button class="secondary inline-cancel" type="button">取消</button>
+          </div>
+        </td>`;
+      sourceRow.insertAdjacentElement("afterend", row);
+      inlineEditorRow = row;
+
+      const input = row.querySelector(".inline-name-input");
+      input.focus();
+      input.select();
+
+      row.querySelector(".inline-cancel").addEventListener("click", removeInlineEditor);
+      row.querySelector(".inline-name-submit").addEventListener("click", async () => {
+        const displayNameNew = input.value.trim();
+        if (!displayNameNew) {
+          showInlineStatus(sourceRow, "修改失敗：名稱不能空白", "error");
+          return;
+        }
+
+        const submit = row.querySelector(".inline-name-submit");
+        submit.disabled = true;
+        try {
+          const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+          if (sessionError || !session?.access_token) throw new Error("登入狀態已失效，請重新登入");
+
+          const response = await fetch(HAWKVISION_ADMIN_API + "/update-display-name", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + session.access_token
+            },
+            body: JSON.stringify({ target_user_id: userId, display_name: displayNameNew })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) throw new Error(result.error || "修改名稱失敗");
+
+          removeInlineEditor();
+          showInlineStatus(sourceRow, "✓ 名稱修改成功", "success");
+          const { data: { user } } = await supabaseClient.auth.getUser();
+          if (user) setTimeout(() => loadDashboard(user), 3000);
+        } catch (error) {
+          showInlineStatus(sourceRow, "修改失敗：" + (error.message || String(error)), "error");
+          submit.disabled = false;
+        }
+      });
+    }
+
+    function openInlinePasswordEditor(userId) {
+      removeInlineEditor();
+      const sourceRow = findAccountRow(userId);
+      if (!sourceRow) return;
+
+      const row = document.createElement("tr");
+      row.className = "inline-edit-row";
+      row.innerHTML = `
+        <td colspan="9">
+          <div class="inline-edit-box">
+            <span class="inline-edit-label">修改密碼</span>
+            <input class="inline-pass-1" type="password" autocomplete="new-password" placeholder="新密碼（至少 8 字元）">
+            <input class="inline-pass-2" type="password" autocomplete="new-password" placeholder="再次輸入新密碼">
+            <button class="primary inline-pass-submit" type="button">確認</button>
+            <button class="secondary inline-cancel" type="button">取消</button>
+          </div>
+        </td>`;
+      sourceRow.insertAdjacentElement("afterend", row);
+      inlineEditorRow = row;
+      row.querySelector(".inline-pass-1").focus();
+
+      row.querySelector(".inline-cancel").addEventListener("click", removeInlineEditor);
+      row.querySelector(".inline-pass-submit").addEventListener("click", async () => {
+        const p1 = row.querySelector(".inline-pass-1").value;
+        const p2 = row.querySelector(".inline-pass-2").value;
+
+        if (p1.length < 8) {
+          showInlineStatus(sourceRow, "重設失敗：新密碼至少需要 8 個字元", "error");
+          return;
+        }
+        if (p1 !== p2) {
+          showInlineStatus(sourceRow, "重設失敗：兩次輸入的密碼不一致", "error");
+          return;
+        }
+
+        const submit = row.querySelector(".inline-pass-submit");
+        submit.disabled = true;
+        try {
+          const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+          if (sessionError || !session?.access_token) throw new Error("登入狀態已失效，請重新登入");
+
+          const response = await fetch(HAWKVISION_ADMIN_API + "/reset-password", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + session.access_token
+            },
+            body: JSON.stringify({ target_user_id: userId, new_password: p1 })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok || !result.ok) throw new Error(result.error || "密碼重設失敗");
+
+          removeInlineEditor();
+          showInlineStatus(sourceRow, "✓ 密碼重設成功", "success");
+        } catch (error) {
+          showInlineStatus(sourceRow, "重設失敗：" + (error.message || String(error)), "error");
+          submit.disabled = false;
+        }
+      });
+    }
+
+    // Capture clicks before the older v1.5.0 handlers and use the compact editor instead.
+    document.getElementById("accountTableBody").addEventListener("click", event => {
+      const nameBtn = event.target.closest(".edit-name-btn");
+      const passwordBtn = event.target.closest(".reset-password-btn");
+      if (!nameBtn && !passwordBtn) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const btn = nameBtn || passwordBtn;
+      if (nameBtn) {
+        openInlineNameEditor(btn.dataset.userId, btn.dataset.name);
+      } else {
+        openInlinePasswordEditor(btn.dataset.userId);
+      }
+    }, true);
+
+    // v1.5.0：本人與直屬下線名稱管理
     const editNamePanel = document.getElementById("editNamePanel");
     const editNameTarget = document.getElementById("editNameTarget");
     const editNameInput = document.getElementById("editNameInput");
@@ -719,6 +895,20 @@
       openResetPassword(btn.dataset.userId, btn.dataset.email, btn.dataset.name);
     });
     cancelResetPasswordBtn.addEventListener("click", closeResetPassword);
+    editMyNameBtn.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
+      if (me) openInlineNameEditor(me.user_id || me.id, me.display_name || "");
+    }, true);
+
+    changeMyPasswordBtn.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
+      if (me) openInlinePasswordEditor(me.user_id || me.id);
+    }, true);
+
     changeMyPasswordBtn.addEventListener("click", () => {
       const me = allAccounts.find(a => String(a.user_id || a.id || "") === String(currentAuthUserId || ""));
       if (!me) return;
