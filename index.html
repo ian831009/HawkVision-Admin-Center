@@ -101,7 +101,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v1.8.4</div>
+  <div class="version">Admin Center v1.8.5</div>
 </header>
 
 <main>
@@ -622,7 +622,14 @@ function openSelfPassword(){
 document.getElementById("loginBtn").addEventListener("click",login);
 document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
 document.getElementById("claimBtn").addEventListener("click",claimPassword);
-document.getElementById("logoutBtn").addEventListener("click",async()=>{if(sessionWatch)clearInterval(sessionWatch);await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});hvClearActiveUser();currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];window.location.replace("https://hawkvisionai.com/?logout=1")});
+document.getElementById("logoutBtn").addEventListener("click",async()=>{
+  if(sessionWatch)clearInterval(sessionWatch);
+  try{await supabaseClient.auth.signOut({scope:"global"})}catch{}
+  try{await supabaseClient.auth.signOut({scope:"local"})}catch{}
+  hvClearActiveUser();
+  currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];
+  window.location.replace("https://hawkvisionai.com/?logout=1");
+});
 document.getElementById("myNameBtn").addEventListener("click",openSelfName);
 document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
 document.getElementById("openCreateBtn").addEventListener("click",()=>{
