@@ -79,7 +79,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v1.8.0</div>
+  <div class="version">Admin Center v1.8.1</div>
 </header>
 
 <main>
@@ -126,7 +126,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <div class="top-actions">
       <button id="myNameBtn" class="soft-cyan" type="button">修改我的名稱</button>
       <button id="myPasswordBtn" class="soft" type="button">修改我的密碼</button>
-      <button id="hawkvisionHomeBtn" class="secondary" type="button">返回 HawkVision</button><button id="logoutBtn" class="secondary" type="button">登出</button>
+      <a id="hawkvisionHomeBtn" class="secondary" href="https://hawkvisionai.com/" style="text-decoration:none;display:inline-flex;align-items:center">返回 HawkVision</a><button id="logoutBtn" class="secondary" type="button">登出</button>
     </div>
   </div>
 
@@ -197,22 +197,44 @@ const SUPABASE_URL="https://rwxujvpakpemiwkitltk.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
 const HAWKVISION_ADMIN_API="https://hawkvision-admin-api.michael19941009.workers.dev";
 
-const HAWKVISION_AUTH_COOKIE="hv-sso-auth-v1";
-const hawkvisionCookieStorage={
-  getItem(key){
-    const prefix=encodeURIComponent(key)+"=";
-    const row=document.cookie.split("; ").find(v=>v.startsWith(prefix));
-    return row?decodeURIComponent(row.slice(prefix.length)):null;
-  },
-  setItem(key,value){
-    document.cookie=`${encodeURIComponent(key)}=${encodeURIComponent(value)}; Domain=.hawkvisionai.com; Path=/; Max-Age=2592000; SameSite=Lax; Secure`;
-  },
-  removeItem(key){
-    document.cookie=`${encodeURIComponent(key)}=; Domain=.hawkvisionai.com; Path=/; Max-Age=0; SameSite=Lax; Secure`;
-  }
-};
 
-const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{storage:hawkvisionCookieStorage,storageKey:HAWKVISION_AUTH_COOKIE,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const HV_ACTIVE_COOKIE="hv-active-user";
+function hvSetActiveUser(userId){
+  document.cookie=`${HV_ACTIVE_COOKIE}=${encodeURIComponent(userId||"")}; Domain=.hawkvisionai.com; Path=/; Max-Age=2592000; SameSite=Lax; Secure`;
+}
+function hvGetActiveUser(){
+  const p=HV_ACTIVE_COOKIE+"=";
+  const row=document.cookie.split("; ").find(v=>v.startsWith(p));
+  return row?decodeURIComponent(row.slice(p.length)):"";
+}
+function hvClearActiveUser(){
+  document.cookie=`${HV_ACTIVE_COOKIE}=; Domain=.hawkvisionai.com; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+}
+async function hvAcceptSso(client){
+  const hash=new URLSearchParams(location.hash.replace(/^#/,""));
+  const access_token=hash.get("hv_at");
+  const refresh_token=hash.get("hv_rt");
+  if(access_token&&refresh_token){
+    const {data,error}=await client.auth.setSession({access_token,refresh_token});
+    history.replaceState(null,"",location.pathname+location.search);
+    if(error)throw error;
+    if(data?.user)hvSetActiveUser(data.user.id);
+    return data?.session||null;
+  }
+  return null;
+}
+async function hvValidateActiveIdentity(client,session){
+  const active=hvGetActiveUser();
+  if(!session?.user)return false;
+  if(active && active!==session.user.id){
+    await client.auth.signOut({scope:"local"}).catch(()=>{});
+    return false;
+  }
+  hvSetActiveUser(session.user.id);
+  return true;
+}
+
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 
 const ROLE_LABEL={co_admin:"共同管理員",shareholder:"股東",master_agent:"總代理",agent:"代理",sub_agent:"子代理",member:"會員"};
 const ROLE_ORDER=["co_admin","shareholder","master_agent","agent","sub_agent","member"];
@@ -578,7 +600,7 @@ function openSelfPassword(){
 document.getElementById("loginBtn").addEventListener("click",login);
 document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
 document.getElementById("claimBtn").addEventListener("click",claimPassword);
-document.getElementById("hawkvisionHomeBtn").addEventListener("click",()=>{window.location.href="https://hawkvisionai.com/"});document.getElementById("logoutBtn").addEventListener("click",async()=>{if(sessionWatch)clearInterval(sessionWatch);await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];window.location.href="https://hawkvisionai.com/"});
+document.getElementById("logoutBtn").addEventListener("click",async()=>{if(sessionWatch)clearInterval(sessionWatch);await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});hvClearActiveUser();currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];window.location.href="https://hawkvisionai.com/"});
 document.getElementById("myNameBtn").addEventListener("click",openSelfName);
 document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
 document.getElementById("openCreateBtn").addEventListener("click",()=>{
@@ -600,7 +622,17 @@ async function restore(){
   try{await loadDashboard()}
   catch(e){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"無法進入管理中心："+translateError(e.message),"error",false)}
 }
-restore();
+(async()=>{
+  await hvAcceptSso(supabaseClient).catch(()=>{});
+  const {data:{session}}=await supabaseClient.auth.getSession();
+  if(!session || !(await hvValidateActiveIdentity(supabaseClient,session))){
+    window.location.replace("https://hawkvisionai.com/");
+    return;
+  }
+  currentUser=session.user;
+  try{await loadDashboard()}
+  catch(e){await supabaseClient.auth.signOut({scope:"local"}).catch(()=>{});window.location.replace("https://hawkvisionai.com/")}
+})();
 </script>
 </body>
 </html>
