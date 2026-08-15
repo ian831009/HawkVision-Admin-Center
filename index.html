@@ -97,12 +97,30 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .hv-return-btn:hover{background:#e2e8f0;border-color:#94a3b8}
 .hv-return-btn:active{transform:translateY(1px)}
 </style>
+<style>
+.audit-list{display:flex;flex-direction:column;gap:10px}
+.audit-item{border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff}
+.audit-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+.audit-type{font-weight:800}
+.audit-time{font-size:12px;color:#64748b}
+.audit-target{font-size:13px;color:#475569;margin-top:4px}
+.audit-detail{margin-top:10px;padding:10px;background:#f8fafc;border-radius:10px;font-size:12px;white-space:pre-wrap;word-break:break-word}
+.weekday-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:8px}
+.weekday-grid label{display:flex;align-items:center;justify-content:center;gap:5px;padding:8px;border:1px solid #e2e8f0;border-radius:9px;margin:0;font-size:12px}
+.weekday-grid input{width:auto}
+.product-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e5e7eb}
+.product-row:last-child{border-bottom:0}
+.product-row input{width:auto;transform:scale(1.2)}
+@media(max-width:700px){
+  .weekday-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+</style>
 
 </head>
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v1.9.0</div>
+  <div class="version">Admin Center v2.0.0</div>
 </header>
 
 <main>
@@ -149,6 +167,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <div class="top-actions">
       <button id="myNameBtn" class="soft-cyan" type="button">修改我的名稱</button>
       <button id="myPasswordBtn" class="soft" type="button">修改我的密碼</button>
+      <button id="auditLogBtn" class="soft-violet" type="button">異動日誌</button>
       <a id="hawkvisionHomeBtn" class="secondary hv-return-btn" href="https://hawkvisionai.com/">返回</a><button id="logoutBtn" class="secondary" type="button">登出</button>
     </div>
   </div>
@@ -492,27 +511,109 @@ async function renderManager(manager,child,row){
     host.querySelector(".reclaim-btn").addEventListener("click",()=>doQuota("reclaim"));
   });
 
-  manager.querySelector(".permission-menu").addEventListener("click",()=>{
-    if(detail.business_role==="co_admin"&&currentSelf.is_platform_owner){
-      host.innerHTML=`<div class="subpanel"><h4>共同管理員權限</h4>
-        <div class="switch-line"><div><strong>使用平台額度</strong><div class="hint">允許此共同管理員代理最高管理員建立帳號時給額度、增加額度與收回額度。</div></div><input class="platform-quota-switch" type="checkbox" ${detail.can_use_platform_quota?"checked":""}></div>
-        <div class="hint">共同管理員永遠沒有永久刪除帳號的權限。</div><div class="local-status status"></div><div class="panel-actions"><button class="primary save-permission" type="button">儲存權限</button></div>
+  manager.querySelector(".permission-menu").addEventListener("click",async()=>{
+    host.innerHTML='<div class="subpanel"><h4>權限管理</h4><div class="empty">載入中…</div></div>';
+    try{
+      const {data:products,error:productError}=await supabaseClient.rpc("hv_admin_product_access_v1",{p_target_user_id:detail.user_id});
+      if(productError)throw productError;
+      const rows=Array.isArray(products)?products:[];
+      const canModify=rows.some(x=>x.can_modify===true);
+
+      let extra="";
+      if(detail.business_role==="co_admin"&&currentSelf.is_platform_owner){
+        extra=`<div class="switch-line"><div><strong>使用平台額度</strong><div class="hint">允許此共同管理員代理最高管理員使用平台額度。</div></div><input class="platform-quota-switch" type="checkbox" ${detail.can_use_platform_quota?"checked":""}></div>`;
+      }
+
+      host.innerHTML=`<div class="subpanel"><h4>權限管理${canModify?"":"（查看）"}</h4>
+        ${extra}
+        <div style="margin-top:8px">${rows.map(p=>`<div class="product-row">
+          <div><strong>${escapeHtml(p.display_name||p.product_key)}</strong><div class="hint">${escapeHtml(p.product_key)}</div></div>
+          <input class="product-switch" data-key="${escapeHtml(p.product_key)}" type="checkbox" ${p.is_enabled?"checked":""} ${p.can_modify?"":"disabled"}>
+        </div>`).join("")||'<div class="empty">沒有可用產品</div>'}</div>
+        <div class="local-status status"></div>
+        ${(canModify || (detail.business_role==="co_admin"&&currentSelf.is_platform_owner))?'<div class="panel-actions"><button class="primary save-permission" type="button">儲存權限</button></div>':""}
       </div>`;
-      host.querySelector(".save-permission").addEventListener("click",async()=>{
+
+      host.querySelector(".save-permission")?.addEventListener("click",async()=>{
         try{
-          const enabled=host.querySelector(".platform-quota-switch").checked;
-          await api("/set-coadmin-platform-quota",{target_user_id:detail.user_id,enabled});
-          detail.can_use_platform_quota=enabled;localStatus(host,"✓ 權限設定成功","success");
+          if(detail.business_role==="co_admin"&&currentSelf.is_platform_owner){
+            const enabled=host.querySelector(".platform-quota-switch")?.checked===true;
+            if(enabled!==Boolean(detail.can_use_platform_quota)){
+              await api("/set-coadmin-platform-quota",{target_user_id:detail.user_id,enabled});
+              detail.can_use_platform_quota=enabled;
+            }
+          }
+
+          for(const input of host.querySelectorAll(".product-switch:not(:disabled)")){
+            const key=input.dataset.key;
+            const original=rows.find(x=>x.product_key===key);
+            const enabled=input.checked===true;
+            if(original && enabled!==Boolean(original.is_enabled)){
+              const {error}=await supabaseClient.rpc("hv_set_user_product_access",{
+                p_target_user_id:detail.user_id,
+                p_product_key:key,
+                p_enabled:enabled
+              });
+              if(error)throw error;
+              original.is_enabled=enabled;
+            }
+          }
+          localStatus(host,"✓ 權限設定成功","success");
         }catch(e){localStatus(host,translateError(e.message))}
       });
-    }else{
-      host.innerHTML=`<div class="subpanel"><h4>權限管理${readonly?"（查看）":""}</h4><p class="reserved">一般商業帳號的細部權限項目尚未定稿；此位置已保留。跨層帳號固定只能查看。</p></div>`;
+
+    }catch(e){
+      host.innerHTML=`<div class="subpanel"><h4>權限管理</h4><div class="status error" style="display:block">${escapeHtml(translateError(e.message))}</div></div>`;
     }
   });
 
-  manager.querySelector(".time-menu").addEventListener("click",()=>{
-    host.innerHTML=`<div class="subpanel"><h4>使用時間管理${readonly?"（查看）":""}</h4><p class="reserved">使用時間的開始、到期、星期與每日時段規則尚未定稿；此位置已保留。跨層帳號固定只能查看。</p></div>`;
+  manager.querySelector(".time-menu").addEventListener("click",async()=>{
+    host.innerHTML='<div class="subpanel"><h4>使用時間管理</h4><div class="empty">載入中…</div></div>';
+    try{
+      const {data:rule,error}=await supabaseClient.rpc("hv_admin_usage_rule_v1",{p_target_user_id:detail.user_id});
+      if(error)throw error;
+      const weekdays=Array.isArray(rule?.allowed_weekdays)?rule.allowed_weekdays:[1,2,3,4,5,6,7];
+      const labels=["一","二","三","四","五","六","日"];
+      const canModify=rule?.can_modify===true;
+
+      host.innerHTML=`<div class="subpanel"><h4>使用時間管理${canModify?"":"（查看）"}</h4>
+        <div class="switch-line"><div><strong>啟用時間限制</strong><div class="hint">關閉時不限制使用時間。</div></div><input class="usage-enabled" type="checkbox" ${rule?.is_enabled?"checked":""} ${canModify?"":"disabled"}></div>
+        <div class="grid">
+          <div><label>開始日期</label><input class="usage-start-date" type="date" value="${escapeHtml(rule?.start_date||"")}" ${canModify?"":"disabled"}></div>
+          <div><label>到期日期</label><input class="usage-end-date" type="date" value="${escapeHtml(rule?.end_date||"")}" ${canModify?"":"disabled"}></div>
+          <div><label>每日開始時間</label><input class="usage-start-time" type="time" value="${escapeHtml((rule?.daily_start||"").slice(0,5))}" ${canModify?"":"disabled"}></div>
+          <div><label>每日結束時間</label><input class="usage-end-time" type="time" value="${escapeHtml((rule?.daily_end||"").slice(0,5))}" ${canModify?"":"disabled"}></div>
+        </div>
+        <label>允許星期</label>
+        <div class="weekday-grid">${labels.map((label,i)=>`<label><input class="weekday-check" type="checkbox" value="${i+1}" ${weekdays.includes(i+1)?"checked":""} ${canModify?"":"disabled"}>週${label}</label>`).join("")}</div>
+        <div class="hint">時區固定使用 Asia/Taipei。每日時間可跨午夜，例如 22:00～06:00。</div>
+        <div class="local-status status"></div>
+        ${canModify?'<div class="panel-actions"><button class="primary save-usage" type="button">儲存時間設定</button></div>':""}
+      </div>`;
+
+      host.querySelector(".save-usage")?.addEventListener("click",async()=>{
+        const days=[...host.querySelectorAll(".weekday-check:checked")].map(x=>Number(x.value));
+        if(!days.length){localStatus(host,"至少選擇一個星期");return}
+        try{
+          const {error}=await supabaseClient.rpc("hv_set_usage_rule_v1",{
+            p_target_user_id:detail.user_id,
+            p_is_enabled:host.querySelector(".usage-enabled").checked===true,
+            p_start_date:host.querySelector(".usage-start-date").value||null,
+            p_end_date:host.querySelector(".usage-end-date").value||null,
+            p_allowed_weekdays:days,
+            p_daily_start:host.querySelector(".usage-start-time").value||null,
+            p_daily_end:host.querySelector(".usage-end-time").value||null,
+            p_timezone:"Asia/Taipei"
+          });
+          if(error)throw error;
+          localStatus(host,"✓ 使用時間設定成功","success");
+        }catch(e){localStatus(host,translateError(e.message))}
+      });
+    }catch(e){
+      host.innerHTML=`<div class="subpanel"><h4>使用時間管理</h4><div class="status error" style="display:block">${escapeHtml(translateError(e.message))}</div></div>`;
+    }
   });
+
 
   manager.querySelector(".name-menu")?.addEventListener("click",()=>{
     host.innerHTML=`<div class="subpanel"><h4>修改名稱</h4><label>新名稱</label><input class="name-input" type="text" maxlength="50" value="${escapeHtml(detail.display_name||"")}"><div class="local-status status"></div><div class="panel-actions"><button class="primary save-name" type="button">確認修改</button></div></div>`;
@@ -618,6 +719,81 @@ async function claimPassword(){
   try{validateAccountLike(p1,"密碼");if(p1!==p2)throw new Error("兩次輸入的密碼不一致");await api("/claim-password",{new_password:p1});setStatus(status,"✓ 密碼設定成功，正在返回登入畫面…","success",false);setTimeout(async()=>{await supabaseClient.auth.signOut();currentUser=null;showOnly("login")},1200)}
   catch(e){setStatus(status,"設定失敗："+translateError(e.message),"error",false)}
 }
+
+const AUDIT_LABELS={
+  ACCOUNT_CREATE:"建立帳號",
+  DISPLAY_NAME_UPDATE:"修改名稱",
+  SELF_PASSWORD_UPDATE:"修改自己的密碼",
+  PASSWORD_RESET:"重設密碼",
+  PASSWORD_CLAIM:"首次密碼接管",
+  COADMIN_PLATFORM_QUOTA_PERMISSION:"共同管理員平台額度權限",
+  QUOTA_ALLOCATE:"分配額度",
+  QUOTA_RECLAIM:"收回額度",
+  QUOTA_CHANGE:"額度異動",
+  ACCOUNT_ENABLE:"啟用帳號",
+  ACCOUNT_DISABLE:"停用帳號",
+  PRODUCT_ACCESS_ENABLE:"開啟產品權限",
+  PRODUCT_ACCESS_DISABLE:"關閉產品權限",
+  USAGE_TIME_UPDATE:"使用時間異動",
+  TAKEOVER_AND_DELETE_ACCOUNT:"刪除並接手下屬",
+  TAKEOVER_DIRECT_CHILDREN_V2:"接手直屬下屬",
+  ENABLE_DIRECT_ACCOUNT:"啟用帳號",
+  DISABLE_DIRECT_ACCOUNT:"停用帳號",
+  ENABLE_DIRECT_BRANCH:"啟用分支",
+  DISABLE_DIRECT_BRANCH:"停用分支"
+};
+
+function formatAuditTime(v){
+  if(!v)return "";
+  try{return new Date(v).toLocaleString("zh-TW",{hour12:false})}catch{return String(v)}
+}
+function auditSummary(item){
+  const n=item.new_data||{},o=item.old_data||{};
+  switch(item.action_type){
+    case "QUOTA_ALLOCATE":
+    case "QUOTA_RECLAIM":
+      return `數量：${fmt(n.amount||0)}｜${fmt(o.quota_before||0)} → ${fmt(n.quota_after||0)}`;
+    case "PRODUCT_ACCESS_ENABLE":
+    case "PRODUCT_ACCESS_DISABLE":
+      return `產品：${n.product_key||o.product_key||"—"}`;
+    case "DISPLAY_NAME_UPDATE":
+      return `${o.target_display_name||"—"} → ${n.target_display_name||"—"}`;
+    case "USAGE_TIME_UPDATE":
+      return `時間限制：${n.is_enabled?"啟用":"關閉"}`;
+    case "TAKEOVER_AND_DELETE_ACCOUNT":
+      return `接手直屬：${n.transferred_direct_children||0} 個`;
+    default:
+      return item.reason||"";
+  }
+}
+async function openAuditLogs(){
+  closeAllPanels();
+  const panel=document.getElementById("selfPanel");
+  panel.style.display="block";
+  panel.innerHTML='<h3>我的異動日誌</h3><div class="empty">載入中…</div>';
+  try{
+    const {data,error}=await supabaseClient.rpc("hv_my_admin_audit_logs_v1",{p_limit:200,p_offset:0});
+    if(error)throw error;
+    const rows=Array.isArray(data)?data:[];
+    panel.innerHTML=`<div class="manager-title"><h3 style="margin:0">我的異動日誌</h3><button class="secondary audit-close" type="button">關閉</button></div>
+      <div class="hint" style="margin:8px 0 12px">只顯示你本人實際操作產生的異動。</div>
+      <div class="audit-list">${rows.map(item=>`<div class="audit-item">
+        <div class="audit-head"><div><div class="audit-type">${escapeHtml(AUDIT_LABELS[item.action_type]||item.action_type)}</div><div class="audit-target">${escapeHtml(item.target_display_name||item.target_account||"—")}</div></div><div class="audit-time">${escapeHtml(formatAuditTime(item.created_at))}</div></div>
+        ${auditSummary(item)?`<div class="audit-target">${escapeHtml(auditSummary(item))}</div>`:""}
+        ${item.has_detail?`<button class="secondary audit-detail-btn" type="button" style="margin-top:8px">查看詳細</button><div class="audit-detail" style="display:none">${escapeHtml(JSON.stringify({old:item.old_data,new:item.new_data,reason:item.reason},null,2))}</div>`:""}
+      </div>`).join("")||'<div class="empty">目前沒有異動紀錄</div>'}</div>`;
+    panel.querySelector(".audit-close").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
+    panel.querySelectorAll(".audit-detail-btn").forEach(btn=>btn.addEventListener("click",()=>{
+      const detail=btn.nextElementSibling;
+      const open=detail.style.display!=="none";
+      detail.style.display=open?"none":"block";
+      btn.textContent=open?"查看詳細":"收起詳細";
+    }));
+  }catch(e){
+    panel.innerHTML=`<h3>我的異動日誌</h3><div class="status error" style="display:block">${escapeHtml(translateError(e.message))}</div>`;
+  }
+}
+
 function openSelfName(){
   closeAllPanels();const panel=document.getElementById("selfPanel");panel.style.display="block";
   panel.innerHTML=`<h3>修改我的名稱</h3><label>新名稱</label><input class="self-name" type="text" value="${escapeHtml(currentSelf.display_name||"")}"><div class="local-status status"></div><div class="panel-actions"><button class="secondary self-cancel" type="button">取消</button><button class="primary self-save" type="button">確認修改</button></div>`;
@@ -656,6 +832,7 @@ document.getElementById("logoutBtn").addEventListener("click",async()=>{
 });
 document.getElementById("myNameBtn").addEventListener("click",openSelfName);
 document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
+document.getElementById("auditLogBtn").addEventListener("click",openAuditLogs);
 document.getElementById("openCreateBtn").addEventListener("click",()=>{clearAccountSearch();
   document.getElementById("selfPanel").style.display="none";document.getElementById("selfPanel").innerHTML="";document.querySelectorAll(".account-manager").forEach(x=>x.remove());resetCreateForm();document.getElementById("createPanel").style.display="block";
 });
