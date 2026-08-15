@@ -79,6 +79,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </style>
 
 <style>
+.delete-rule-note{margin-top:10px;color:#991b1b;font-size:12px}
 .hv-return-btn{
   text-decoration:none;
   display:inline-flex;
@@ -101,7 +102,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v1.8.5</div>
+  <div class="version">Admin Center v1.9.0</div>
 </header>
 
 <main>
@@ -156,7 +157,10 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
   <div class="section">
     <div class="toolbar">
-      <input id="accountSearch" type="search" placeholder="搜尋名稱或帳號" />
+      <div style="display:flex;gap:8px;flex:1;min-width:240px">
+        <input id="accountSearch" type="search" placeholder="搜尋名稱或帳號" />
+        <button id="accountSearchBtn" class="secondary" type="button">搜尋</button>
+      </div>
       <div class="toolbar-right">
         <span id="accountCount" class="muted">—</span>
         <button id="openCreateBtn" class="primary" type="button">＋ 新增帳號</button>
@@ -262,7 +266,7 @@ const ROLE_LABEL={co_admin:"共同管理員",shareholder:"股東",master_agent:"
 const ROLE_ORDER=["co_admin","shareholder","master_agent","agent","sub_agent","member"];
 const ACCOUNT_PASSWORD_RE=/^(?=.{6,11}$)(?=.*[a-z])(?=(?:.*\d){5,})[a-z0-9]+$/;
 
-let currentUser=null,currentSelf=null,currentChildren=[],contextStack=[],createAllowedRoles=[];
+let currentUser=null,currentSelf=null,currentChildren=[],contextStack=[],createAllowedRoles=[];let appliedSearch="";
 let sessionWatch=null;
 
 const loginSection=document.getElementById("loginSection");
@@ -399,9 +403,14 @@ function renderContextHeader(){
 }
 function roleText(c){const base=c.role_name||ROLE_LABEL[c.business_role]||c.business_role;return c.is_cross_level?"直屬"+base:base}
 function filteredChildren(){
-  const q=document.getElementById("accountSearch").value.trim().toLowerCase();
+  const q=String(appliedSearch||"").trim().toLowerCase();
   if(!q)return currentChildren;
   return currentChildren.filter(c=>[c.display_name,c.account,c.role_name,c.business_role].some(v=>String(v||"").toLowerCase().includes(q)));
+}
+function clearAccountSearch(){
+  appliedSearch="";
+  const input=document.getElementById("accountSearch");
+  if(input)input.value="";
 }
 function childRowHtml(c){
   const canEnter=c.business_role!=="member"&&c.can_create_downline;
@@ -419,14 +428,14 @@ function renderChildren(){
   list.innerHTML=active.map(childRowHtml).join("")+(disabled.length?'<div class="disabled-divider">── 已停用帳號 ──</div>'+disabled.map(childRowHtml).join(""):"");
   for(const child of all){
     const row=list.querySelector(`.child-row[data-id="${CSS.escape(String(child.user_id))}"]`);
-    row.querySelector(".manage-btn").addEventListener("click",async()=>{
+    row.querySelector(".manage-btn").addEventListener("click",async()=>{clearAccountSearch();
       document.getElementById("createPanel").style.display="none";
       document.getElementById("selfPanel").style.display="none";
       document.querySelectorAll(".account-manager").forEach(x=>x.remove());
       const manager=document.createElement("div");manager.className="account-manager";row.appendChild(manager);
       await renderManager(manager,child,row);
     });
-    row.querySelector(".enter-btn")?.addEventListener("click",async()=>{closeAllPanels();contextStack.push(child);await loadContext(false)});
+    row.querySelector(".enter-btn")?.addEventListener("click",async()=>{clearAccountSearch();closeAllPanels();contextStack.push(child);await loadContext(false)});
   }
 }
 function localStatus(host,msg,type="error"){let el=host.querySelector(".local-status");if(!el){el=document.createElement("div");el.className="status local-status";host.appendChild(el)}setStatus(el,msg,type,false)}
@@ -436,9 +445,13 @@ function rowSuccess(row,msg){
 }
 
 async function renderManager(manager,child,row){
-  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:child.user_id});
+  const [{data,error},{data:takeoverPlan,error:takeoverError}]=await Promise.all([
+    supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_takeover_delete_plan_v3",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id})
+  ]);
   if(error){manager.innerHTML=`<div class="status error" style="display:block;">${escapeHtml(translateError(error.message))}</div>`;return}
   const detail={...child,...data},readonly=!detail.can_full_manage,noQuota=["member","co_admin"].includes(detail.business_role);
+  detail.takeover_delete_plan=takeoverError?null:takeoverPlan;
   manager.innerHTML=`<div class="manager-title"><strong>${escapeHtml(detail.display_name||"未命名")}｜${escapeHtml(detail.role_name||ROLE_LABEL[detail.business_role]||"")}</strong><button class="secondary close-manager" type="button">收起</button></div>
     ${readonly?'<div class="readonly-note">目前為跨層查看模式：額度、權限、使用時間只能查看。</div>':""}
     <div class="manager-menu">
@@ -450,8 +463,12 @@ async function renderManager(manager,child,row){
     <div class="subpanel-host"></div>
     ${readonly?"":`<div class="danger-zone"><div class="manager-menu">
       ${detail.can_toggle_enabled?`<button class="${detail.is_enabled?"danger-soft":"soft-green"} toggle-menu" type="button">${detail.is_enabled?"停用帳號":"啟用帳號"}</button>`:""}
-      ${detail.can_delete?'<button class="danger delete-menu" type="button">刪除帳號</button>':""}
-    </div></div>`}`;
+      ${detail.takeover_delete_plan?.allowed===true?'<button class="danger delete-menu" type="button">刪除帳號</button>':""}
+    </div>
+    ${detail.is_enabled===false && detail.takeover_delete_plan && detail.takeover_delete_plan.allowed!==true
+      ? `<div class="hint" style="margin-top:10px;color:#991b1b">刪除條件：${escapeHtml(detail.takeover_delete_plan.reason||"目前尚未符合刪除條件")}</div>`
+      : ""}
+    </div>`}`;
 
   const host=manager.querySelector(".subpanel-host");
   manager.querySelector(".close-manager").addEventListener("click",()=>manager.remove());
@@ -528,11 +545,18 @@ async function renderManager(manager,child,row){
   });
 
   manager.querySelector(".delete-menu")?.addEventListener("click",async()=>{
-    const plan=detail.delete_plan||{},count=Number(plan.account_count||1);
-    const text=count>1?`此操作將永久刪除「${detail.display_name||detail.account}」及其所有下屬，共 ${count} 個帳號。\n\n刪除後無法復原。`:`確定永久刪除「${detail.display_name||detail.account}」？\n\n刪除後無法復原。`;
-    if(!confirm(text))return;
-    try{const result=await api("/delete-account",{target_user_id:child.user_id});manager.remove();rowSuccess(row,"✓ "+(result.message||"帳號刪除成功"));await loadContext(false)}
-    catch(e){localStatus(host,translateError(e.message))}
+    const plan=detail.takeover_delete_plan||{};
+    const transferCount=Number(plan.direct_children||0);
+    const message=transferCount>0
+      ? `確定永久刪除「${detail.display_name||detail.account}」？\n\n其 ${transferCount} 個直屬下屬會轉為你的直屬關係；更下層的關係保持不變。\n\n刪除後無法復原。`
+      : `確定永久刪除「${detail.display_name||detail.account}」？\n\n刪除後無法復原。`;
+    if(!confirm(message))return;
+    try{
+      const result=await api("/delete-account",{target_user_id:child.user_id});
+      manager.remove();
+      rowSuccess(row,"✓ "+(result.message||"帳號刪除成功"));
+      await loadContext(false);
+    }catch(e){localStatus(host,translateError(e.message))}
   });
 }
 
@@ -632,7 +656,7 @@ document.getElementById("logoutBtn").addEventListener("click",async()=>{
 });
 document.getElementById("myNameBtn").addEventListener("click",openSelfName);
 document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
-document.getElementById("openCreateBtn").addEventListener("click",()=>{
+document.getElementById("openCreateBtn").addEventListener("click",()=>{clearAccountSearch();
   document.getElementById("selfPanel").style.display="none";document.getElementById("selfPanel").innerHTML="";document.querySelectorAll(".account-manager").forEach(x=>x.remove());resetCreateForm();document.getElementById("createPanel").style.display="block";
 });
 document.getElementById("cancelCreateBtn").addEventListener("click",()=>{document.getElementById("createPanel").style.display="none";resetCreateForm()});
@@ -640,9 +664,18 @@ document.getElementById("createBtn").addEventListener("click",createAccount);
 document.getElementById("newRole").addEventListener("change",e=>{
   const noQuota=["member","co_admin"].includes(e.target.value);document.getElementById("initialQuotaWrap").style.display=noQuota?"none":"block";if(noQuota)document.getElementById("initialQuota").value="0";
 });
-document.getElementById("accountSearch").addEventListener("input",renderChildren);
-document.getElementById("backBtn").addEventListener("click",async()=>{if(contextStack.length<=1)return;closeAllPanels();contextStack.pop();await loadContext(false)});
-document.getElementById("homeBtn").addEventListener("click",async()=>{if(contextStack.length<=1)return;closeAllPanels();contextStack=contextStack.slice(0,1);await loadContext(false)});
+document.getElementById("accountSearchBtn").addEventListener("click",()=>{
+  appliedSearch=document.getElementById("accountSearch").value.trim();
+  renderChildren();
+});
+document.getElementById("accountSearch").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    appliedSearch=e.currentTarget.value.trim();
+    renderChildren();
+  }
+});
+document.getElementById("backBtn").addEventListener("click",async()=>{if(contextStack.length<=1)return;clearAccountSearch();closeAllPanels();contextStack.pop();await loadContext(false)});
+document.getElementById("homeBtn").addEventListener("click",async()=>{if(contextStack.length<=1)return;clearAccountSearch();closeAllPanels();contextStack=contextStack.slice(0,1);await loadContext(false)});
 
 async function restore(){
   const {data:{session}}=await supabaseClient.auth.getSession();
