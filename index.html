@@ -1,1236 +1,586 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HawkVision 管理中心</title>
-  <style>
-    * { box-sizing: border-box; }
-
-    :root{
-      --bg:#f4f6f8;
-      --card:#ffffff;
-      --text:#1f2937;
-      --muted:#64748b;
-      --line:#e5e7eb;
-      --primary:#2563eb;
-      --primary-soft:#eff6ff;
-      --cyan:#0891b2;
-      --cyan-soft:#ecfeff;
-      --violet:#7c3aed;
-      --violet-soft:#f5f3ff;
-      --amber:#d97706;
-      --amber-soft:#fffbeb;
-      --green:#15803d;
-      --green-soft:#f0fdf4;
-      --red:#b91c1c;
-      --red-soft:#fef2f2;
-      --slate:#475569;
-      --slate-soft:#f8fafc;
-    }
-
-    body {
-      margin: 0;
-      font-family: Arial, "Noto Sans TC", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-
-    header {
-      background: linear-gradient(90deg, #111827, #172554);
-      color: white;
-      padding: 20px 28px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    header h1 { margin:0; font-size:26px; }
-    header p { margin:7px 0 0; color:#cbd5e1; font-size:14px; }
-
-    .version {
-      background:#2563eb;
-      color:white;
-      padding:9px 15px;
-      border-radius:999px;
-      font-size:14px;
-      white-space:nowrap;
-    }
-
-    main {
-      max-width:1180px;
-      margin:26px auto;
-      padding:0 18px 44px;
-    }
-
-    .card, .section, .login-card {
-      background:var(--card);
-      border-radius:16px;
-      box-shadow:0 3px 15px rgba(0,0,0,.06);
-    }
-
-    .section { padding:22px; margin-bottom:22px; }
-    .login-card { max-width:520px; margin:0 auto; padding:24px; }
-    h2,h3 { margin-top:0; }
-
-    label {
-      display:block;
-      margin:12px 0 6px;
-      font-weight:700;
-      font-size:14px;
-    }
-
-    input, select {
-      width:100%;
-      padding:11px 12px;
-      border:1px solid #cbd5e1;
-      border-radius:10px;
-      font-size:15px;
-      background:white;
-      color:var(--text);
-    }
-
-    button {
-      border:0;
-      border-radius:10px;
-      padding:10px 13px;
-      font-size:14px;
-      font-weight:700;
-      cursor:pointer;
-    }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-
-    .primary { background:var(--primary); color:white; }
-    .secondary { background:#e5e7eb; color:#111827; }
-    .soft { background:var(--primary-soft); color:#1d4ed8; }
-    .soft-cyan { background:var(--cyan-soft); color:#155e75; }
-    .soft-violet { background:var(--violet-soft); color:#6d28d9; }
-    .soft-amber { background:var(--amber-soft); color:#92400e; }
-    .soft-green { background:var(--green-soft); color:#166534; }
-    .danger { background:var(--red); color:white; }
-    .danger-soft { background:var(--red-soft); color:#991b1b; }
-
-    .login-card .primary { width:100%; margin-top:18px; padding:12px 16px; }
-
-    #dashboard, #claimSection { display:none; }
-
-    .top-user {
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:14px;
-      flex-wrap:wrap;
-    }
-
-    .identity-name { font-size:18px; font-weight:800; }
-    .identity-role { color:var(--muted); margin-left:7px; font-size:14px; }
-    .top-actions { display:flex; gap:8px; flex-wrap:wrap; }
-
-    .cards {
-      display:grid;
-      grid-template-columns:repeat(4, 1fr);
-      gap:14px;
-      margin-bottom:22px;
-    }
-    .metric {
-      background:white;
-      border-radius:14px;
-      padding:18px;
-      box-shadow:0 3px 15px rgba(0,0,0,.06);
-    }
-    .metric .label { color:var(--muted); font-size:13px; margin-bottom:8px; }
-    .metric .value { font-size:28px; font-weight:800; }
-
-    .toolbar, .context-line {
-      display:flex;
-      gap:10px;
-      align-items:center;
-      justify-content:space-between;
-      flex-wrap:wrap;
-    }
-
-    .toolbar input { max-width:320px; }
-    .toolbar-right { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-
-    .muted { color:var(--muted); font-size:13px; }
-
-    .panel {
-      display:none;
-      margin:14px 0;
-      padding:16px;
-      border:1px solid #dbeafe;
-      background:#f8fbff;
-      border-radius:12px;
-    }
-
-    .grid {
-      display:grid;
-      grid-template-columns:repeat(2, minmax(0,1fr));
-      gap:0 14px;
-    }
-
-    .panel-actions {
-      display:flex;
-      justify-content:flex-end;
-      gap:8px;
-      flex-wrap:wrap;
-      margin-top:14px;
-    }
-
-    .breadcrumb {
-      display:flex;
-      gap:4px;
-      flex-wrap:wrap;
-      align-items:center;
-      margin:12px 0;
-      font-size:13px;
-      color:var(--muted);
-    }
-    .breadcrumb button {
-      background:transparent;
-      color:var(--primary);
-      padding:5px 7px;
-    }
-
-    .child-list {
-      border:1px solid var(--line);
-      border-radius:12px;
-      overflow:hidden;
-      margin-top:12px;
-      background:white;
-    }
-
-    .child-row {
-      padding:14px;
-      border-bottom:1px solid var(--line);
-      background:white;
-    }
-    .child-row:last-child { border-bottom:0; }
-
-    .child-row.disabled-account {
-      background:#fffafa;
-    }
-
-    .child-head {
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
-    }
-
-    .child-main { min-width:180px; }
-    .child-title { font-weight:800; font-size:16px; display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
-    .child-account { margin-top:4px; color:var(--muted); font-size:13px; }
-
-    .badge {
-      display:inline-flex;
-      align-items:center;
-      padding:4px 8px;
-      border-radius:999px;
-      font-size:12px;
-      font-weight:800;
-      background:#dbeafe;
-      color:#1d4ed8;
-    }
-    .badge.direct { background:#ede9fe; color:#6d28d9; }
-    .badge.disabled { background:#fee2e2; color:#991b1b; }
-
-    .row-actions {
-      display:flex;
-      gap:7px;
-      flex-wrap:wrap;
-      justify-content:flex-end;
-    }
-
-    .account-manager {
-      margin-top:12px;
-      border:1px solid #e2e8f0;
-      background:var(--slate-soft);
-      border-radius:12px;
-      padding:14px;
-    }
-
-    .manager-title {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-bottom:10px;
-    }
-
-    .manager-menu {
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-
-    .subpanel {
-      margin-top:12px;
-      padding:14px;
-      border:1px solid #e2e8f0;
-      background:white;
-      border-radius:10px;
-    }
-
-    .subpanel h4 { margin:0 0 8px; }
-
-    .quota-summary {
-      display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
-      gap:10px;
-      margin-bottom:10px;
-    }
-    .summary-box {
-      background:#f8fafc;
-      border:1px solid #e2e8f0;
-      border-radius:10px;
-      padding:12px;
-    }
-    .summary-box .small { color:var(--muted); font-size:12px; }
-    .summary-box .big { font-size:21px; font-weight:800; margin-top:3px; }
-
-    .danger-zone {
-      margin-top:14px;
-      padding-top:12px;
-      border-top:1px solid #fecaca;
-    }
-
-    .disabled-divider {
-      padding:11px 14px;
-      background:#fff7f7;
-      color:#991b1b;
-      font-weight:800;
-      font-size:13px;
-      border-top:2px solid #ef4444;
-      border-bottom:1px solid #fecaca;
-    }
-
-    .empty {
-      padding:26px;
-      text-align:center;
-      color:var(--muted);
-    }
-
-    .status {
-      display:none;
-      margin:10px 0;
-      padding:10px 12px;
-      border-radius:10px;
-      font-size:13px;
-      font-weight:800;
-    }
-    .status.success { background:#dcfce7; color:#166534; }
-    .status.error { background:#fee2e2; color:#991b1b; }
-
-    .readonly-note {
-      margin:8px 0 0;
-      color:#7c2d12;
-      background:#fff7ed;
-      padding:9px 10px;
-      border-radius:8px;
-      font-size:13px;
-    }
-
-    .reserved {
-      color:var(--muted);
-      font-size:13px;
-      line-height:1.6;
-    }
-
-    .claim-card {
-      max-width:560px;
-      margin:0 auto;
-      background:white;
-      border-radius:16px;
-      padding:24px;
-      box-shadow:0 3px 15px rgba(0,0,0,.06);
-    }
-
-    @media (max-width:850px){
-      .cards { grid-template-columns:repeat(2,1fr); }
-      header { padding:18px; }
-    }
-
-    @media (max-width:600px){
-      header { flex-direction:column; align-items:flex-start; }
-      .cards { grid-template-columns:1fr; }
-      .grid, .quota-summary { grid-template-columns:1fr; }
-      .row-actions, .manager-menu { justify-content:flex-start; }
-      .toolbar input { max-width:none; width:100%; }
-      .toolbar { align-items:stretch; }
-      .toolbar-right { justify-content:space-between; }
-      .section { padding:16px; }
-      .child-row { padding:12px; }
-      .row-actions button, .manager-menu button { flex:1 1 calc(50% - 8px); }
-      .panel-actions button { flex:1 1 120px; }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HawkVision 管理中心</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#f4f6f8;--card:#fff;--text:#1f2937;--muted:#64748b;--line:#e5e7eb;
+  --blue:#2563eb;--blueSoft:#eff6ff;--cyanSoft:#ecfeff;--violetSoft:#f5f3ff;
+  --amberSoft:#fffbeb;--greenSoft:#f0fdf4;--red:#b91c1c;--redSoft:#fef2f2
+}
+body{margin:0;font-family:Arial,"Noto Sans TC",sans-serif;background:var(--bg);color:var(--text)}
+header{background:linear-gradient(90deg,#111827,#172554);color:#fff;padding:20px 28px;display:flex;justify-content:space-between;align-items:center;gap:16px}
+header h1{margin:0;font-size:26px} header p{margin:7px 0 0;color:#cbd5e1;font-size:14px}
+.version{background:#2563eb;padding:9px 15px;border-radius:999px;font-size:14px;white-space:nowrap}
+main{max-width:1180px;margin:26px auto;padding:0 18px 44px}
+.section,.login-card,.claim-card{background:#fff;border-radius:16px;box-shadow:0 3px 15px rgba(0,0,0,.06)}
+.section{padding:20px;margin-bottom:20px}.login-card,.claim-card{max-width:540px;margin:0 auto;padding:24px}
+h2,h3,h4{margin-top:0}
+label{display:block;margin:12px 0 6px;font-weight:700;font-size:14px}
+input,select{width:100%;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;background:#fff;color:var(--text)}
+button{border:0;border-radius:10px;padding:10px 13px;font-size:14px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.primary{background:var(--blue);color:#fff}.secondary{background:#e5e7eb;color:#111827}
+.soft{background:var(--blueSoft);color:#1d4ed8}.soft-cyan{background:var(--cyanSoft);color:#155e75}
+.soft-violet{background:var(--violetSoft);color:#6d28d9}.soft-amber{background:var(--amberSoft);color:#92400e}
+.soft-green{background:var(--greenSoft);color:#166534}.danger{background:var(--red);color:#fff}
+.danger-soft{background:var(--redSoft);color:#991b1b}
+#dashboard,#claimSection{display:none}
+.login-card .primary,.claim-card>.primary{width:100%;margin-top:16px;padding:12px}
+.top-user,.toolbar,.context-line,.manager-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.identity-name{font-size:18px;font-weight:800}.identity-role{color:var(--muted);margin-left:7px;font-size:14px}
+.top-actions,.toolbar-right,.row-actions,.manager-menu,.nav-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:800;background:#dbeafe;color:#1d4ed8}
+.badge.disabled{background:#fee2e2;color:#991b1b}.badge.direct{background:#ede9fe;color:#6d28d9}
+.panel{display:none;margin:14px 0;padding:16px;border:1px solid #dbeafe;background:#f8fbff;border-radius:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+.panel-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px}
+.hint{font-size:12px;color:var(--muted);margin-top:5px}
+.toolbar input{max-width:320px}
+.breadcrumb{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:12px 0;color:var(--muted);font-size:13px}
+.breadcrumb button{background:transparent;color:var(--blue);padding:5px 7px}
+.context-main{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.context-quota{display:flex;gap:8px;flex-wrap:wrap;color:#334155;font-size:13px}
+.context-quota span{background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:6px 9px}
+.child-list{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:12px;background:#fff}
+.child-row{padding:14px;border-bottom:1px solid var(--line);background:#fff}.child-row:last-child{border-bottom:0}
+.child-row.disabled-account{background:#fffafa}
+.child-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.child-title{font-weight:800;font-size:16px;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.child-account{margin-top:4px;color:var(--muted);font-size:13px}
+.account-manager{margin-top:12px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:12px;padding:14px}
+.subpanel{margin-top:12px;padding:14px;border:1px solid #e2e8f0;background:#fff;border-radius:10px}
+.readonly-note{margin:8px 0 0;color:#7c2d12;background:#fff7ed;padding:9px 10px;border-radius:8px;font-size:13px}
+.quota-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.summary-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px}
+.summary-box .small{font-size:12px;color:var(--muted)}.summary-box .big{font-size:21px;font-weight:800;margin-top:3px}
+.danger-zone{margin-top:14px;padding-top:12px;border-top:1px solid #fecaca}
+.disabled-divider{padding:11px 14px;background:#fff7f7;color:#991b1b;font-weight:800;font-size:13px;border-top:2px solid #ef4444;border-bottom:1px solid #fecaca}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.status{display:none;margin:10px 0;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:800}
+.status.success{background:#dcfce7;color:#166534}.status.error{background:#fee2e2;color:#991b1b}
+.muted{color:var(--muted);font-size:13px}.reserved{color:var(--muted);font-size:13px;line-height:1.6}
+.password-wrap{display:flex;gap:6px;align-items:center}.password-wrap input{flex:1}.eye-btn{background:#eef2f7;color:#475569;min-width:44px;padding:10px}
+.switch-line{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0}
+.switch-line input{width:auto;transform:scale(1.2)}
+@media(max-width:700px){
+  header{flex-direction:column;align-items:flex-start;padding:18px}
+  .grid,.quota-summary{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar input{max-width:none}
+  .section{padding:15px}.child-row{padding:12px}
+  .row-actions button,.manager-menu button{flex:1 1 calc(50% - 8px)}
+  .panel-actions button{flex:1 1 120px}
+  .context-line{align-items:flex-start}.nav-actions{width:100%}.nav-actions button{flex:1}
+}
+</style>
 </head>
 <body>
 <header>
-  <div>
-    <h1>HawkVision 管理中心</h1>
-    <p>帳號、層級、額度與管理權限</p>
-  </div>
-  <div class="version">Admin Center v1.7.0</div>
+  <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
+  <div class="version">Admin Center v1.7.1</div>
 </header>
 
 <main>
-  <section id="loginSection" class="login-card">
-    <h2>管理員登入</h2>
-
-    <label for="loginAccount">帳號</label>
-    <input id="loginAccount" type="text" autocomplete="username" placeholder="請輸入帳號" />
-
-    <label for="loginPassword">密碼</label>
+<section id="loginSection" class="login-card">
+  <h2>管理員登入</h2>
+  <label for="loginAccount">帳號</label>
+  <input id="loginAccount" type="text" autocomplete="username" placeholder="請輸入帳號" />
+  <label for="loginPassword">密碼</label>
+  <div class="password-wrap">
     <input id="loginPassword" type="password" autocomplete="current-password" placeholder="請輸入密碼" />
+    <button class="eye-btn" type="button" data-toggle-password="#loginPassword">👁</button>
+  </div>
+  <div id="loginStatus" class="status error"></div>
+  <button id="loginBtn" class="primary">登入管理中心</button>
+</section>
 
-    <button id="loginBtn" class="primary">登入管理中心</button>
-    <div id="loginStatus" class="status error"></div>
-  </section>
-
-  <section id="claimSection">
-    <div class="claim-card">
-      <h2>首次登入安全設定</h2>
-      <p class="muted">此帳號第一次登入必須先設定只有你自己知道的新密碼。設定成功後會登出，請使用新密碼重新登入。</p>
-
-      <label for="claimPassword1">新密碼</label>
-      <input id="claimPassword1" type="password" autocomplete="new-password" placeholder="6～11 字元，小寫英文＋至少 5 個數字" />
-
-      <label for="claimPassword2">再次輸入新密碼</label>
-      <input id="claimPassword2" type="password" autocomplete="new-password" />
-
-      <div id="claimStatus" class="status"></div>
-
-      <button id="claimBtn" class="primary" style="width:100%;margin-top:14px;">設定新密碼並重新登入</button>
+<section id="claimSection">
+  <div class="claim-card">
+    <h2>首次登入安全設定</h2>
+    <p class="muted">第一次登入必須設定只有你自己知道的新密碼。設定成功後會登出，請使用新密碼重新登入。</p>
+    <label for="claimPassword1">新密碼</label>
+    <div class="password-wrap">
+      <input id="claimPassword1" type="password" autocomplete="new-password" placeholder="6–11字元，小寫英文＋至少五個數字" />
+      <button class="eye-btn" type="button" data-toggle-password="#claimPassword1">👁</button>
     </div>
-  </section>
-
-  <section id="dashboard">
-    <div class="section top-user">
-      <div>
-        <span id="currentName" class="identity-name">—</span>
-        <span id="currentRole" class="identity-role">—</span>
-      </div>
-
-      <div class="top-actions">
-        <button id="myNameBtn" class="soft-cyan" type="button">修改我的名稱</button>
-        <button id="myPasswordBtn" class="soft" type="button">修改我的密碼</button>
-        <button id="logoutBtn" class="secondary" type="button">登出</button>
-      </div>
+    <div class="hint">6–11字元，小寫英文＋至少五個數字</div>
+    <label for="claimPassword2">再次輸入新密碼</label>
+    <div class="password-wrap">
+      <input id="claimPassword2" type="password" autocomplete="new-password" placeholder="再次輸入新密碼" />
+      <button class="eye-btn" type="button" data-toggle-password="#claimPassword2">👁</button>
     </div>
+    <div id="claimStatus" class="status"></div>
+    <button id="claimBtn" class="primary">設定新密碼並重新登入</button>
+  </div>
+</section>
 
-    <div id="selfPanel" class="section panel"></div>
+<section id="dashboard">
+  <div class="section top-user">
+    <div>
+      <span id="currentName" class="identity-name">—</span>
+      <span id="currentRole" class="identity-role">—</span>
+      <span id="currentStatus" class="badge">啟用中</span>
+    </div>
+    <div class="top-actions">
+      <button id="myNameBtn" class="soft-cyan" type="button">修改我的名稱</button>
+      <button id="myPasswordBtn" class="soft" type="button">修改我的密碼</button>
+      <button id="logoutBtn" class="secondary" type="button">登出</button>
+    </div>
+  </div>
 
-    <div class="cards">
-      <div class="metric">
-        <div id="metric1Label" class="label">—</div>
-        <div id="metric1Value" class="value">—</div>
-      </div>
-      <div class="metric">
-        <div id="metric2Label" class="label">—</div>
-        <div id="metric2Value" class="value">—</div>
-      </div>
-      <div class="metric">
-        <div id="metric3Label" class="label">—</div>
-        <div id="metric3Value" class="value">—</div>
-      </div>
-      <div class="metric">
-        <div id="metric4Label" class="label">—</div>
-        <div id="metric4Value" class="value">—</div>
+  <div id="selfPanel" class="section panel"></div>
+
+  <div class="section">
+    <div class="toolbar">
+      <input id="accountSearch" type="search" placeholder="搜尋名稱或帳號" />
+      <div class="toolbar-right">
+        <span id="accountCount" class="muted">—</span>
+        <button id="openCreateBtn" class="primary" type="button">＋ 新增帳號</button>
       </div>
     </div>
 
-    <div class="section">
-      <div class="toolbar">
-        <input id="accountSearch" type="search" placeholder="搜尋名稱或帳號" />
-        <div class="toolbar-right">
-          <span id="accountCount" class="muted">—</span>
-          <button id="openCreateBtn" class="primary" type="button">＋ 新增帳號</button>
-        </div>
-      </div>
-
-      <div id="createPanel" class="panel">
-        <h3>新增下屬帳號</h3>
-        <div class="grid">
-          <div>
-            <label for="newName">名稱</label>
-            <input id="newName" type="text" />
-          </div>
-          <div>
-            <label for="newAccount">帳號</label>
-            <input id="newAccount" type="text" placeholder="例如 abc12345" />
-          </div>
-          <div>
-            <label for="newPassword">初始密碼</label>
-            <input id="newPassword" type="password" autocomplete="new-password" placeholder="6～11 字元，小寫英文＋至少 5 個數字" />
-          </div>
-          <div>
-            <label for="newRole">商業層級</label>
-            <select id="newRole"></select>
-          </div>
-          <div id="initialQuotaWrap">
-            <label for="initialQuota">初始額度</label>
-            <input id="initialQuota" type="number" min="0" step="1" value="0" />
-          </div>
-        </div>
-
-        <div class="panel-actions">
-          <button id="cancelCreateBtn" class="secondary" type="button">取消</button>
-          <button id="createBtn" class="primary" type="button">建立帳號</button>
-        </div>
-      </div>
-
-      <div id="pageStatus" class="status"></div>
-
-      <div id="breadcrumb" class="breadcrumb"></div>
-
-      <div class="context-line">
+    <div id="createPanel" class="panel">
+      <h3>新增下屬帳號</h3>
+      <div class="grid">
+        <div><label for="newName">名稱</label><input id="newName" type="text" /></div>
         <div>
+          <label for="newAccount">帳號</label>
+          <input id="newAccount" type="text" placeholder="6–11字元，小寫英文＋至少五個數字" />
+          <div class="hint">6–11字元，小寫英文＋至少五個數字</div>
+        </div>
+        <div>
+          <label for="newPassword">初始密碼</label>
+          <div class="password-wrap">
+            <input id="newPassword" type="password" autocomplete="new-password" placeholder="6–11字元，小寫英文＋至少五個數字" />
+            <button class="eye-btn" type="button" data-toggle-password="#newPassword">👁</button>
+          </div>
+          <div class="hint">6–11字元，小寫英文＋至少五個數字</div>
+        </div>
+        <div><label for="newRole">商業層級</label><select id="newRole"></select></div>
+        <div id="initialQuotaWrap"><label for="initialQuota">初始額度</label><input id="initialQuota" type="number" min="0" step="1" value="0" /></div>
+      </div>
+      <div id="createStatus" class="status"></div>
+      <div class="panel-actions">
+        <button id="cancelCreateBtn" class="secondary" type="button">取消</button>
+        <button id="createBtn" class="primary" type="button">建立帳號</button>
+      </div>
+    </div>
+
+    <div id="pageStatus" class="status"></div>
+    <div id="breadcrumb" class="breadcrumb"></div>
+
+    <div class="context-line">
+      <div>
+        <div class="context-main">
           <span class="muted">目前查看：</span>
           <strong id="contextTitle">—</strong>
+          <span id="contextStatus" class="badge">啟用中</span>
         </div>
-        <button id="backBtn" class="secondary" type="button">返回上一層</button>
+        <div id="contextQuota" class="context-quota"></div>
       </div>
-
-      <div id="childList" class="child-list">
-        <div class="empty">載入中…</div>
+      <div class="nav-actions">
+        <button id="backBtn" class="secondary" type="button">← 返回上一層</button>
+        <button id="homeBtn" class="secondary" type="button">⌂ 回到最上層</button>
       </div>
     </div>
-  </section>
+
+    <div id="childList" class="child-list"><div class="empty">載入中…</div></div>
+  </div>
+</section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const SUPABASE_URL = "https://rwxujvpakpemiwkitltk.supabase.co";
-  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
-  const HAWKVISION_ADMIN_API = "https://hawkvision-admin-api.michael19941009.workers.dev";
+const SUPABASE_URL="https://rwxujvpakpemiwkitltk.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
+const HAWKVISION_ADMIN_API="https://hawkvision-admin-api.michael19941009.workers.dev";
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const ROLE_LABEL={co_admin:"共同管理員",shareholder:"股東",master_agent:"總代理",agent:"代理",sub_agent:"子代理",member:"會員"};
+const ROLE_ORDER=["co_admin","shareholder","master_agent","agent","sub_agent","member"];
+const ACCOUNT_PASSWORD_RE=/^(?=.{6,11}$)(?=.*[a-z])(?=(?:.*\d){5,})[a-z0-9]+$/;
 
-  const ROLE_LABEL = {
-    co_admin: "共同管理員",
-    shareholder: "股東",
-    master_agent: "總代理",
-    agent: "代理",
-    sub_agent: "子代理",
-    member: "會員"
-  };
+let currentUser=null,currentSelf=null,currentChildren=[],contextStack=[],createAllowedRoles=[];
+let sessionWatch=null;
 
-  const ROLE_ORDER = ["co_admin","shareholder","master_agent","agent","sub_agent","member"];
-  const ACCOUNT_PASSWORD_RE = /^(?=.{6,11}$)(?=.*[a-z])(?=(?:.*\d){5,})[a-z0-9]+$/;
+const loginSection=document.getElementById("loginSection");
+const claimSection=document.getElementById("claimSection");
+const dashboard=document.getElementById("dashboard");
 
-  let currentUser = null;
-  let currentSelf = null;
-  let currentChildren = [];
-  let contextStack = [];
-  let createAllowedRoles = [];
-  let pageTimer = null;
+function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]))}
+function fmt(v){return Number(v??0).toLocaleString("en-US")}
+function loginEmail(raw){const v=String(raw||"").trim().toLowerCase();return v.includes("@")?v:(v?v+"@hawkvision.local":"")}
+function validateAccountLike(v,label){if(!ACCOUNT_PASSWORD_RE.test(String(v||"")))throw new Error(`${label}必須為6–11字元，只能使用小寫英文與數字，至少1個小寫英文字母及至少5個數字`)}
 
-  const loginSection = document.getElementById("loginSection");
-  const claimSection = document.getElementById("claimSection");
-  const dashboard = document.getElementById("dashboard");
+function translateError(message){
+  const m=String(message||"").trim();
+  const lower=m.toLowerCase();
+  if(lower.includes("invalid login credentials"))return `帳號或密碼錯誤（${m}）`;
+  if(lower.includes("user already registered")||lower.includes("already been registered")||lower.includes("duplicate key"))return `此帳號已經存在，請更換其他帳號（${m}）`;
+  if(lower.includes("email rate limit"))return `操作過於頻繁，請稍後再試（${m}）`;
+  if(lower.includes("failed to fetch")||lower.includes("network"))return `目前無法連接伺服器，請稍後再試（${m}）`;
+  if(lower.includes("jwt")||lower.includes("token")||lower.includes("session"))return `登入狀態已失效，請重新登入（${m}）`;
+  if(lower.includes("permission")||lower.includes("not authorized")||lower.includes("row-level security"))return `你沒有執行此操作的權限（${m}）`;
+  return m||"操作失敗";
+}
+function setStatus(el,msg,type="success",auto=false){
+  el.textContent=msg;el.className=`status ${type}`;el.style.display="block";
+  if(auto)setTimeout(()=>{el.style.display="none";el.textContent=""},3000);
+}
+function showPage(msg,type="success"){setStatus(document.getElementById("pageStatus"),msg,type,true)}
+function showOnly(which){loginSection.style.display=which==="login"?"block":"none";claimSection.style.display=which==="claim"?"block":"none";dashboard.style.display=which==="dashboard"?"block":"none"}
 
-  function escapeHtml(v){
-    return String(v ?? "").replace(/[&<>"']/g, ch => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-    }[ch]));
-  }
-
-  function fmt(v){ return Number(v ?? 0).toLocaleString("en-US"); }
-
-  function shortAccount(v){
-    const s = String(v || "");
-    return s.includes("@") ? s.split("@")[0] : s;
-  }
-
-  function loginEmail(raw){
-    const v = String(raw || "").trim().toLowerCase();
-    return v.includes("@") ? v : (v ? v + "@hawkvision.local" : "");
-  }
-
-  function validateAccountLike(v, label){
-    if(!ACCOUNT_PASSWORD_RE.test(String(v || ""))){
-      throw new Error(`${label}必須為 6～11 個字元，只能使用小寫英文與數字，至少 1 個小寫英文字母及至少 5 個數字`);
-    }
-  }
-
-  function setStatus(el, msg, type="success", auto=true){
-    el.textContent = msg;
-    el.className = `status ${type}`;
-    el.style.display = "block";
-    if(auto){
-      setTimeout(() => {
-        el.style.display = "none";
-        el.textContent = "";
-      }, 3000);
-    }
-  }
-
-  function showPage(msg, type="success"){
-    const el = document.getElementById("pageStatus");
-    if(pageTimer) clearTimeout(pageTimer);
-    el.textContent = msg;
-    el.className = `status ${type}`;
-    el.style.display = "block";
-    pageTimer = setTimeout(() => {
-      el.style.display = "none";
-      el.textContent = "";
-    }, 3000);
-  }
-
-  function showOnly(which){
-    loginSection.style.display = which === "login" ? "block" : "none";
-    claimSection.style.display = which === "claim" ? "block" : "none";
-    dashboard.style.display = which === "dashboard" ? "block" : "none";
-  }
-
-  async function token(){
-    const {data:{session}, error} = await supabaseClient.auth.getSession();
-    if(error || !session?.access_token) throw new Error("登入狀態已失效，請重新登入");
-    return session.access_token;
-  }
-
-  async function api(path, body){
-    const t = await token();
-    const response = await fetch(HAWKVISION_ADMIN_API + path, {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization":"Bearer " + t
-      },
-      body: JSON.stringify(body || {})
+function bindPasswordToggles(scope=document){
+  scope.querySelectorAll("[data-toggle-password]").forEach(btn=>{
+    if(btn.dataset.bound==="1")return;
+    btn.dataset.bound="1";
+    btn.addEventListener("click",()=>{
+      const input=scope.querySelector(btn.dataset.togglePassword)||document.querySelector(btn.dataset.togglePassword);
+      if(!input)return;
+      input.type=input.type==="password"?"text":"password";
+      btn.textContent=input.type==="password"?"👁":"🙈";
     });
-    const data = await response.json().catch(() => ({}));
-    if(!response.ok || !data.ok) throw new Error(data.error || "操作失敗");
-    return data;
-  }
+  });
+}
+bindPasswordToggles();
 
-  function closeTransientPanels(){
-    document.getElementById("createPanel").style.display = "none";
-    document.getElementById("selfPanel").style.display = "none";
-    document.getElementById("selfPanel").innerHTML = "";
-    document.querySelectorAll(".account-manager").forEach(x => x.remove());
-    resetCreateForm();
+async function token(){
+  const {data:{session},error}=await supabaseClient.auth.getSession();
+  if(error||!session?.access_token)throw new Error("登入狀態已失效，請重新登入");
+  return session.access_token;
+}
+async function api(path,body){
+  const t=await token();
+  const response=await fetch(HAWKVISION_ADMIN_API+path,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify(body||{})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.ok){
+    if(data.code==="ACCOUNT_DISABLED")await handleDisabled();
+    throw new Error(translateError(data.error||"操作失敗"));
   }
+  return data;
+}
 
-  async function selfDetail(){
-    const {data, error} = await supabaseClient.rpc("hv_admin_account_detail_v2", {
-      p_target_user_id: currentUser.id
+function resetCreateForm(){
+  document.getElementById("newName").value="";
+  document.getElementById("newAccount").value="";
+  document.getElementById("newPassword").value="";
+  document.getElementById("newRole").value="";
+  document.getElementById("initialQuota").value="0";
+  document.getElementById("initialQuotaWrap").style.display="block";
+  document.getElementById("createStatus").style.display="none";
+}
+function closeAllPanels(){
+  document.getElementById("createPanel").style.display="none";
+  document.getElementById("selfPanel").style.display="none";
+  document.getElementById("selfPanel").innerHTML="";
+  document.querySelectorAll(".account-manager").forEach(x=>x.remove());
+  resetCreateForm();
+}
+
+async function handleDisabled(){
+  if(sessionWatch){clearInterval(sessionWatch);sessionWatch=null}
+  await supabaseClient.auth.signOut().catch(()=>{});
+  currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];
+  showOnly("login");
+  setStatus(document.getElementById("loginStatus"),"此帳號目前已停用，無法使用管理中心","error",false);
+}
+function startSessionWatch(){
+  if(sessionWatch)clearInterval(sessionWatch);
+  sessionWatch=setInterval(async()=>{
+    if(!currentUser)return;
+    const {data,error}=await supabaseClient.rpc("hv_my_enabled_status");
+    if(!error&&data&&data.is_enabled===false)await handleDisabled();
+  },5000);
+}
+
+async function selfDetail(){
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:currentUser.id});
+  if(error)throw new Error(translateError(error.message));
+  return data;
+}
+async function rootContext(){
+  const {data,error}=await supabaseClient.rpc("hv_admin_root_context_v3");
+  if(error)throw new Error(translateError(error.message));
+  return data;
+}
+async function allowedRolesFor(parentId){
+  const roles=[];
+  for(const role of ROLE_ORDER){
+    const {data,error}=await supabaseClient.rpc("hv_can_create_role_for_parent",{p_actor_user_id:currentUser.id,p_parent_user_id:parentId,p_target_role:role});
+    if(!error&&data===true)roles.push(role);
+  }
+  return roles;
+}
+async function canActAsParent(parentId){
+  const {data,error}=await supabaseClient.rpc("hv_can_act_as_parent",{p_actor_user_id:currentUser.id,p_parent_user_id:parentId});
+  return !error&&data===true;
+}
+
+function renderBreadcrumb(){
+  const box=document.getElementById("breadcrumb");
+  box.innerHTML=contextStack.map((ctx,i)=>`<button type="button" data-i="${i}">${escapeHtml(ctx.display_name||ctx.account||"未命名")}</button>${i<contextStack.length-1?"<span>›</span>":""}`).join("");
+  box.querySelectorAll("button[data-i]").forEach(btn=>btn.addEventListener("click",async()=>{
+    closeAllPanels();contextStack=contextStack.slice(0,Number(btn.dataset.i)+1);await loadContext(false);
+  }));
+}
+function renderContextHeader(){
+  const ctx=contextStack.at(-1);
+  document.getElementById("contextTitle").textContent=`${ctx.display_name||ctx.account||"未命名"}｜${ctx.role_name||ROLE_LABEL[ctx.business_role]||""}`;
+  const status=document.getElementById("contextStatus");
+  status.textContent=ctx.is_enabled?"啟用中":"🚫 已停用";
+  status.className="badge"+(ctx.is_enabled?"":" disabled");
+  const q=document.getElementById("contextQuota");
+  q.innerHTML=ctx.business_role==="member"?"":`<span>分配總額度：<strong>${fmt(ctx.quota_total)}</strong></span><span>剩餘額度：<strong>${fmt(ctx.quota_remaining)}</strong></span>`;
+  document.getElementById("backBtn").style.display=contextStack.length>1?"inline-block":"none";
+  document.getElementById("homeBtn").style.display=contextStack.length>1?"inline-block":"none";
+  renderBreadcrumb();
+}
+function roleText(c){const base=c.role_name||ROLE_LABEL[c.business_role]||c.business_role;return c.is_cross_level?"直屬"+base:base}
+function filteredChildren(){
+  const q=document.getElementById("accountSearch").value.trim().toLowerCase();
+  if(!q)return currentChildren;
+  return currentChildren.filter(c=>[c.display_name,c.account,c.role_name,c.business_role].some(v=>String(v||"").toLowerCase().includes(q)));
+}
+function childRowHtml(c){
+  const canEnter=c.business_role!=="member"&&c.can_create_downline;
+  return `<div class="child-row ${c.is_enabled?"":"disabled-account"}" data-id="${escapeHtml(c.user_id)}">
+    <div class="child-head">
+      <div><div class="child-title"><span>${escapeHtml(c.display_name||"未命名")}</span><span class="badge ${c.is_cross_level?"direct":""}">${escapeHtml(roleText(c))}</span>${c.is_enabled?"":'<span class="badge disabled">🚫 已停用</span>'}</div><div class="child-account">帳號：${escapeHtml(c.account||"—")}</div></div>
+      <div class="row-actions"><button class="soft manage-btn" type="button">管理帳號</button>${canEnter?'<button class="secondary enter-btn" type="button">查看下層 ›</button>':""}</div>
+    </div>
+  </div>`;
+}
+function renderChildren(){
+  const list=document.getElementById("childList"),all=filteredChildren(),active=all.filter(x=>x.is_enabled),disabled=all.filter(x=>!x.is_enabled);
+  document.getElementById("accountCount").textContent=`顯示 ${all.length} / ${currentChildren.length} 個下屬`;
+  if(!all.length){list.innerHTML='<div class="empty">目前沒有符合的下屬帳號</div>';return}
+  list.innerHTML=active.map(childRowHtml).join("")+(disabled.length?'<div class="disabled-divider">── 已停用帳號 ──</div>'+disabled.map(childRowHtml).join(""):"");
+  for(const child of all){
+    const row=list.querySelector(`.child-row[data-id="${CSS.escape(String(child.user_id))}"]`);
+    row.querySelector(".manage-btn").addEventListener("click",async()=>{
+      document.getElementById("createPanel").style.display="none";
+      document.getElementById("selfPanel").style.display="none";
+      document.querySelectorAll(".account-manager").forEach(x=>x.remove());
+      const manager=document.createElement("div");manager.className="account-manager";row.appendChild(manager);
+      await renderManager(manager,child,row);
     });
-    if(error) throw error;
-    return data;
+    row.querySelector(".enter-btn")?.addEventListener("click",async()=>{closeAllPanels();contextStack.push(child);await loadContext(false)});
   }
+}
+function localStatus(host,msg,type="error"){let el=host.querySelector(".local-status");if(!el){el=document.createElement("div");el.className="status local-status";host.appendChild(el)}setStatus(el,msg,type,false)}
+function rowSuccess(row,msg){
+  const el=document.createElement("div");el.className="status success";el.style.display="block";el.textContent=msg;row.appendChild(el);
+  setTimeout(()=>el.remove(),3000);
+}
 
-  async function allowedRolesFor(parentId){
-    const roles = [];
-    for(const role of ROLE_ORDER){
-      const {data, error} = await supabaseClient.rpc("hv_can_create_role_for_parent", {
-        p_actor_user_id: currentUser.id,
-        p_parent_user_id: parentId,
-        p_target_role: role
-      });
-      if(!error && data === true) roles.push(role);
-    }
-    return roles;
-  }
+async function renderManager(manager,child,row){
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:child.user_id});
+  if(error){manager.innerHTML=`<div class="status error" style="display:block;">${escapeHtml(translateError(error.message))}</div>`;return}
+  const detail={...child,...data},readonly=!detail.can_full_manage,noQuota=["member","co_admin"].includes(detail.business_role);
+  manager.innerHTML=`<div class="manager-title"><strong>${escapeHtml(detail.display_name||"未命名")}｜${escapeHtml(detail.role_name||ROLE_LABEL[detail.business_role]||"")}</strong><button class="secondary close-manager" type="button">收起</button></div>
+    ${readonly?'<div class="readonly-note">目前為跨層查看模式：額度、權限、使用時間只能查看。</div>':""}
+    <div class="manager-menu">
+      ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
+      <button class="soft-violet permission-menu" type="button">權限管理</button>
+      <button class="soft-amber time-menu" type="button">使用時間管理</button>
+      ${readonly?"":'<button class="soft-cyan name-menu" type="button">修改名稱</button><button class="soft password-menu" type="button">修改密碼</button>'}
+    </div>
+    <div class="subpanel-host"></div>
+    ${readonly?"":`<div class="danger-zone"><div class="manager-menu">
+      ${detail.can_toggle_enabled?`<button class="${detail.is_enabled?"danger-soft":"soft-green"} toggle-menu" type="button">${detail.is_enabled?"停用帳號":"啟用帳號"}</button>`:""}
+      ${detail.can_delete?'<button class="danger delete-menu" type="button">刪除帳號</button>':""}
+    </div></div>`}`;
 
-  async function canActAsParent(parentId){
-    const {data, error} = await supabaseClient.rpc("hv_can_act_as_parent", {
-      p_actor_user_id: currentUser.id,
-      p_parent_user_id: parentId
-    });
-    return !error && data === true;
-  }
+  const host=manager.querySelector(".subpanel-host");
+  manager.querySelector(".close-manager").addEventListener("click",()=>manager.remove());
 
-  async function loadMetrics(){
-    if(currentSelf.is_platform_owner){
-      const {data, error} = await supabaseClient.rpc("hv_admin_dashboard_stats");
-      if(!error){
-        const s = Array.isArray(data) ? data[0] : data;
-        document.getElementById("metric1Label").textContent = "平台帳號上限";
-        document.getElementById("metric1Value").textContent = fmt(s?.platform_max);
-        document.getElementById("metric2Label").textContent = "目前帳號數";
-        document.getElementById("metric2Value").textContent = fmt(s?.current_accounts);
-        document.getElementById("metric3Label").textContent = "已分配額度";
-        document.getElementById("metric3Value").textContent = fmt(s?.allocated_quota);
-        document.getElementById("metric4Label").textContent = "可分配額度";
-        document.getElementById("metric4Value").textContent = fmt(s?.available_quota);
-        return;
-      }
-    }
+  manager.querySelector(".quota-menu")?.addEventListener("click",()=>{
+    host.innerHTML=`<div class="subpanel"><h4>額度管理</h4><div class="quota-summary">
+      <div class="summary-box"><div class="small">分配總額度</div><div class="big">${fmt(detail.quota_total)}</div></div>
+      <div class="summary-box"><div class="small">剩餘額度</div><div class="big">${fmt(detail.quota_remaining)}</div></div></div>
+      ${readonly?"":`<div class="grid"><div><label>額度數量</label><input class="quota-amount" type="number" min="1" step="1" /></div><div><label>原因／備註（選填）</label><input class="quota-reason" type="text" /></div></div><div class="local-status status"></div><div class="panel-actions"><button class="danger-soft reclaim-btn" type="button">收回額度</button><button class="primary allocate-btn" type="button">分配額度</button></div>`}
+    </div>`;
+    if(readonly)return;
+    const doQuota=async action=>{
+      const amount=Number(host.querySelector(".quota-amount").value),reason=host.querySelector(".quota-reason").value.trim();
+      if(!Number.isInteger(amount)||amount<=0){localStatus(host,"額度必須是大於0的整數");return}
+      try{
+        await api(action==="allocate"?"/allocate-quota":"/reclaim-quota",{owner_user_id:child.parent_id,target_user_id:child.user_id,amount,reason});
+        manager.remove();rowSuccess(row,action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功");await loadContext(false);
+      }catch(e){localStatus(host,translateError(e.message))}
+    };
+    host.querySelector(".allocate-btn").addEventListener("click",()=>doQuota("allocate"));
+    host.querySelector(".reclaim-btn").addEventListener("click",()=>doQuota("reclaim"));
+  });
 
-    document.getElementById("metric1Label").textContent = "分配總額度";
-    document.getElementById("metric1Value").textContent = fmt(currentSelf.quota_total);
-    document.getElementById("metric2Label").textContent = "剩餘額度";
-    document.getElementById("metric2Value").textContent = fmt(currentSelf.quota_remaining);
-    document.getElementById("metric3Label").textContent = "直屬帳號數";
-    document.getElementById("metric3Value").textContent = fmt(currentChildren.length);
-    document.getElementById("metric4Label").textContent = "帳號狀態";
-    document.getElementById("metric4Value").textContent = currentSelf.is_enabled ? "啟用" : "停用";
-  }
-
-  function renderBreadcrumb(){
-    const box = document.getElementById("breadcrumb");
-    box.innerHTML = contextStack.map((ctx, i) => `
-      <button type="button" data-i="${i}">${escapeHtml(ctx.display_name || ctx.account || "未命名")}</button>
-      ${i < contextStack.length - 1 ? "<span>›</span>" : ""}
-    `).join("");
-
-    box.querySelectorAll("button[data-i]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        closeTransientPanels();
-        contextStack = contextStack.slice(0, Number(btn.dataset.i) + 1);
-        await loadContext();
-      });
-    });
-  }
-
-  function renderContextHeader(){
-    const ctx = contextStack.at(-1);
-    document.getElementById("contextTitle").textContent =
-      `${ctx.display_name || ctx.account || "未命名"}｜${ctx.role_name || ROLE_LABEL[ctx.business_role] || ""}`;
-    document.getElementById("backBtn").style.display = contextStack.length > 1 ? "inline-block" : "none";
-    renderBreadcrumb();
-  }
-
-  function roleText(child){
-    const base = child.role_name || ROLE_LABEL[child.business_role] || child.business_role;
-    return child.is_cross_level ? "直屬" + base : base;
-  }
-
-  function filteredChildren(){
-    const q = document.getElementById("accountSearch").value.trim().toLowerCase();
-    if(!q) return currentChildren;
-    return currentChildren.filter(c => [c.display_name,c.account,c.role_name,c.business_role]
-      .some(v => String(v||"").toLowerCase().includes(q)));
-  }
-
-  function childRowHtml(c){
-    const canEnter = c.business_role !== "member" && c.can_create_downline;
-    return `
-      <div class="child-row ${c.is_enabled ? "" : "disabled-account"}" data-id="${escapeHtml(c.user_id)}">
-        <div class="child-head">
-          <div class="child-main">
-            <div class="child-title">
-              <span>${escapeHtml(c.display_name || "未命名")}</span>
-              <span class="badge ${c.is_cross_level ? "direct" : ""}">${escapeHtml(roleText(c))}</span>
-              ${c.is_enabled ? "" : '<span class="badge disabled">🚫 已停用</span>'}
-            </div>
-            <div class="child-account">帳號：${escapeHtml(c.account || "—")}</div>
-          </div>
-          <div class="row-actions">
-            <button class="soft manage-btn" type="button">管理帳號</button>
-            ${canEnter ? '<button class="secondary enter-btn" type="button">查看下層 ›</button>' : ""}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderChildren(){
-    const list = document.getElementById("childList");
-    const all = filteredChildren();
-    const active = all.filter(x => x.is_enabled);
-    const disabled = all.filter(x => !x.is_enabled);
-
-    document.getElementById("accountCount").textContent = `顯示 ${all.length} / ${currentChildren.length} 個下屬`;
-
-    if(!all.length){
-      list.innerHTML = '<div class="empty">目前沒有符合的下屬帳號</div>';
-      return;
-    }
-
-    let html = active.map(childRowHtml).join("");
-    if(disabled.length){
-      html += '<div class="disabled-divider">── 已停用帳號 ──</div>';
-      html += disabled.map(childRowHtml).join("");
-    }
-    list.innerHTML = html;
-
-    for(const child of all){
-      const row = list.querySelector(`.child-row[data-id="${CSS.escape(String(child.user_id))}"]`);
-      if(!row) continue;
-
-      row.querySelector(".manage-btn").addEventListener("click", async () => {
-        document.querySelectorAll(".account-manager").forEach(x => x.remove());
-        const manager = document.createElement("div");
-        manager.className = "account-manager";
-        row.appendChild(manager);
-        await renderManager(manager, child, row);
-      });
-
-      row.querySelector(".enter-btn")?.addEventListener("click", async () => {
-        closeTransientPanels();
-        contextStack.push(child);
-        await loadContext();
-      });
-    }
-  }
-
-  async function renderManager(manager, child, row){
-    let detail = child;
-    try{
-      const {data, error} = await supabaseClient.rpc("hv_admin_account_detail_v2", {
-        p_target_user_id: child.user_id
-      });
-      if(error) throw error;
-      detail = {...child, ...data};
-    }catch(e){
-      manager.innerHTML = `<div class="status error" style="display:block;">讀取失敗：${escapeHtml(e.message)}</div>`;
-      return;
-    }
-
-    const readonly = !detail.can_full_manage;
-    const member = detail.business_role === "member";
-
-    manager.innerHTML = `
-      <div class="manager-title">
-        <strong>${escapeHtml(detail.display_name || "未命名")}｜${escapeHtml(detail.role_name || ROLE_LABEL[detail.business_role] || "")}</strong>
-        <button class="secondary close-manager" type="button">收起</button>
-      </div>
-
-      ${readonly ? '<div class="readonly-note">目前為跨層查看模式：可查看額度、權限與使用時間，但不能修改。</div>' : ""}
-
-      <div class="manager-menu">
-        ${member ? "" : '<button class="soft quota-menu" type="button">額度管理</button>'}
-        <button class="soft-violet permission-menu" type="button">權限管理</button>
-        <button class="soft-amber time-menu" type="button">使用時間管理</button>
-        ${readonly ? "" : '<button class="soft-cyan name-menu" type="button">修改名稱</button><button class="soft password-menu" type="button">修改密碼</button>'}
-      </div>
-
-      <div class="subpanel-host"></div>
-
-      ${readonly ? "" : `
-        <div class="danger-zone">
-          <div class="manager-menu">
-            ${detail.can_toggle_enabled ? `<button class="${detail.is_enabled ? "danger-soft" : "soft-green"} toggle-menu" type="button">${detail.is_enabled ? "停用帳號" : "啟用帳號"}</button>` : ""}
-            ${detail.can_delete ? '<button class="danger delete-menu" type="button">刪除帳號</button>' : ""}
-          </div>
-        </div>
-      `}
-    `;
-
-    const host = manager.querySelector(".subpanel-host");
-    const clearHost = () => host.innerHTML = "";
-
-    manager.querySelector(".close-manager").addEventListener("click", () => manager.remove());
-
-    manager.querySelector(".quota-menu")?.addEventListener("click", () => {
-      host.innerHTML = `
-        <div class="subpanel">
-          <h4>額度管理</h4>
-          <div class="quota-summary">
-            <div class="summary-box">
-              <div class="small">分配總額度</div>
-              <div class="big">${fmt(detail.quota_total)}</div>
-            </div>
-            <div class="summary-box">
-              <div class="small">剩餘額度</div>
-              <div class="big">${fmt(detail.quota_remaining)}</div>
-            </div>
-          </div>
-
-          ${readonly ? "" : `
-            <div class="grid">
-              <div>
-                <label>額度數量</label>
-                <input class="quota-amount" type="number" min="1" step="1" />
-              </div>
-              <div>
-                <label>原因／備註（選填）</label>
-                <input class="quota-reason" type="text" />
-              </div>
-            </div>
-            <div class="panel-actions">
-              <button class="danger-soft reclaim-btn" type="button">收回額度</button>
-              <button class="primary allocate-btn" type="button">分配額度</button>
-            </div>
-          `}
-        </div>
-      `;
-
-      if(readonly) return;
-
-      const doQuota = async action => {
-        const amount = Number(host.querySelector(".quota-amount").value);
-        const reason = host.querySelector(".quota-reason").value.trim();
-        if(!Number.isInteger(amount) || amount <= 0){
-          showPage("操作失敗：額度必須是大於 0 的整數", "error");
-          return;
-        }
+  manager.querySelector(".permission-menu").addEventListener("click",()=>{
+    if(detail.business_role==="co_admin"&&currentSelf.is_platform_owner){
+      host.innerHTML=`<div class="subpanel"><h4>共同管理員權限</h4>
+        <div class="switch-line"><div><strong>使用平台額度</strong><div class="hint">允許此共同管理員代理最高管理員建立帳號時給額度、增加額度與收回額度。</div></div><input class="platform-quota-switch" type="checkbox" ${detail.can_use_platform_quota?"checked":""}></div>
+        <div class="hint">共同管理員永遠沒有永久刪除帳號的權限。</div><div class="local-status status"></div><div class="panel-actions"><button class="primary save-permission" type="button">儲存權限</button></div>
+      </div>`;
+      host.querySelector(".save-permission").addEventListener("click",async()=>{
         try{
-          await api(action === "allocate" ? "/allocate-quota" : "/reclaim-quota", {
-            owner_user_id: child.parent_id,
-            target_user_id: child.user_id,
-            amount,
-            reason
-          });
-          manager.remove();
-          showPage(action === "allocate" ? "✓ 額度分配成功" : "✓ 額度收回成功");
-          await loadContext(false);
-        }catch(e){
-          showPage("操作失敗：" + e.message, "error");
-        }
-      };
-
-      host.querySelector(".allocate-btn").addEventListener("click", () => doQuota("allocate"));
-      host.querySelector(".reclaim-btn").addEventListener("click", () => doQuota("reclaim"));
-    });
-
-    manager.querySelector(".permission-menu").addEventListener("click", () => {
-      host.innerHTML = `
-        <div class="subpanel">
-          <h4>權限管理${readonly ? "（查看）" : ""}</h4>
-          <p class="reserved">權限管理位置已正式保留。實際權限項目尚未定稿，因此本版不自行假設權限開關；跨層帳號將固定為只讀模式。</p>
-        </div>`;
-    });
-
-    manager.querySelector(".time-menu").addEventListener("click", () => {
-      host.innerHTML = `
-        <div class="subpanel">
-          <h4>使用時間管理${readonly ? "（查看）" : ""}</h4>
-          <p class="reserved">使用時間管理位置已正式保留。開始／到期時間、星期與每日時段等規則尚未定稿；跨層帳號將固定為只讀模式。</p>
-        </div>`;
-    });
-
-    manager.querySelector(".name-menu")?.addEventListener("click", () => {
-      host.innerHTML = `
-        <div class="subpanel">
-          <h4>修改名稱</h4>
-          <label>新名稱</label>
-          <input class="name-input" type="text" maxlength="50" value="${escapeHtml(detail.display_name || "")}" />
-          <div class="panel-actions">
-            <button class="primary save-name" type="button">確認修改</button>
-          </div>
-        </div>`;
-      host.querySelector(".save-name").addEventListener("click", async () => {
-        const value = host.querySelector(".name-input").value.trim();
-        if(!value){ showPage("修改失敗：名稱不能空白","error"); return; }
-        try{
-          await api("/update-display-name", {target_user_id:child.user_id, display_name:value});
-          manager.remove();
-          showPage("✓ 名稱修改成功");
-          await loadContext(false);
-        }catch(e){ showPage("修改失敗：" + e.message,"error"); }
+          const enabled=host.querySelector(".platform-quota-switch").checked;
+          await api("/set-coadmin-platform-quota",{target_user_id:detail.user_id,enabled});
+          detail.can_use_platform_quota=enabled;localStatus(host,"✓ 權限設定成功","success");
+        }catch(e){localStatus(host,translateError(e.message))}
       });
-    });
-
-    manager.querySelector(".password-menu")?.addEventListener("click", () => {
-      host.innerHTML = `
-        <div class="subpanel">
-          <h4>重設密碼</h4>
-          <div class="grid">
-            <div>
-              <label>新密碼</label>
-              <input class="p1" type="password" autocomplete="new-password" />
-            </div>
-            <div>
-              <label>再次輸入</label>
-              <input class="p2" type="password" autocomplete="new-password" />
-            </div>
-          </div>
-          <div class="panel-actions">
-            <button class="primary save-password" type="button">確認重設</button>
-          </div>
-        </div>`;
-      host.querySelector(".save-password").addEventListener("click", async () => {
-        const p1 = host.querySelector(".p1").value;
-        const p2 = host.querySelector(".p2").value;
-        try{
-          validateAccountLike(p1,"密碼");
-          if(p1 !== p2) throw new Error("兩次輸入的密碼不一致");
-          await api("/reset-password", {target_user_id:child.user_id,new_password:p1});
-          manager.remove();
-          showPage("✓ 密碼重設成功；該帳號下次登入需重新設定密碼");
-          await loadContext(false);
-        }catch(e){ showPage("重設失敗：" + e.message,"error"); }
-      });
-    });
-
-    manager.querySelector(".toggle-menu")?.addEventListener("click", async () => {
-      const enabling = !detail.is_enabled;
-      const ok = confirm(`${enabling ? "啟用" : "停用"}「${detail.display_name || detail.account}」及其所有下屬帳號？`);
-      if(!ok) return;
-      try{
-        await api("/set-account-enabled", {
-          target_user_id:child.user_id,
-          enabled:enabling
-        });
-        manager.remove();
-        showPage(enabling ? "✓ 帳號及所有下屬已啟用" : "✓ 帳號及所有下屬已停用");
-        await loadContext(false);
-      }catch(e){ showPage("操作失敗：" + e.message,"error"); }
-    });
-
-    manager.querySelector(".delete-menu")?.addEventListener("click", async () => {
-      const ok = confirm(`確定永久刪除「${detail.display_name || detail.account}」？\n\n此操作無法復原。`);
-      if(!ok) return;
-      try{
-        await api("/delete-account",{target_user_id:child.user_id});
-        manager.remove();
-        showPage("✓ 帳號刪除成功");
-        await loadContext(false);
-      }catch(e){ showPage("刪除失敗：" + e.message,"error"); }
-    });
-  }
-
-  async function loadContext(closePanels=true){
-    if(closePanels) closeTransientPanels();
-
-    const ctx = contextStack.at(-1);
-    renderContextHeader();
-
-    document.getElementById("childList").innerHTML = '<div class="empty">載入中…</div>';
-
-    const {data, error} = await supabaseClient.rpc("hv_admin_list_children_v2", {
-      p_parent_user_id: ctx.user_id
-    });
-
-    if(error){
-      document.getElementById("childList").innerHTML =
-        `<div class="empty">載入失敗：${escapeHtml(error.message)}</div>`;
-      return;
+    }else{
+      host.innerHTML=`<div class="subpanel"><h4>權限管理${readonly?"（查看）":""}</h4><p class="reserved">一般商業帳號的細部權限項目尚未定稿；此位置已保留。跨層帳號固定只能查看。</p></div>`;
     }
-
-    currentChildren = Array.isArray(data) ? data : [];
-
-    createAllowedRoles = await allowedRolesFor(ctx.user_id);
-    const canCreate = await canActAsParent(ctx.user_id);
-
-    document.getElementById("openCreateBtn").style.display =
-      canCreate && createAllowedRoles.length ? "inline-block" : "none";
-
-    populateRoleSelect();
-    renderChildren();
-    await loadMetrics();
-  }
-
-  function populateRoleSelect(){
-    const sel = document.getElementById("newRole");
-    sel.innerHTML = '<option value="">請選擇層級</option>' +
-      createAllowedRoles.map(r => `<option value="${r}">${ROLE_LABEL[r] || r}</option>`).join("");
-  }
-
-  function resetCreateForm(){
-    document.getElementById("newName").value = "";
-    document.getElementById("newAccount").value = "";
-    document.getElementById("newPassword").value = "";
-    document.getElementById("newRole").value = "";
-    document.getElementById("initialQuota").value = "0";
-    document.getElementById("initialQuotaWrap").style.display = "block";
-  }
-
-  async function createAccount(){
-    const ctx = contextStack.at(-1);
-    const name = document.getElementById("newName").value.trim();
-    const account = document.getElementById("newAccount").value.trim();
-    const password = document.getElementById("newPassword").value;
-    const role = document.getElementById("newRole").value;
-    const quota = role === "member" ? 0 : Number(document.getElementById("initialQuota").value || 0);
-
-    try{
-      if(!name) throw new Error("請輸入名稱");
-      validateAccountLike(account,"帳號");
-      validateAccountLike(password,"密碼");
-      if(!role) throw new Error("請選擇商業層級");
-      if(!Number.isInteger(quota) || quota < 0) throw new Error("初始額度必須是 0 以上整數");
-
-      await api("/create-account", {
-        parent_user_id: ctx.user_id,
-        display_name:name,
-        account,
-        password,
-        business_role:role,
-        initial_quota:quota
-      });
-
-      document.getElementById("createPanel").style.display = "none";
-      resetCreateForm();
-      showPage(role === "member" ? "✓ 會員帳號建立成功" : `✓ 帳號建立成功${quota>0 ? `，已分配額度 ${quota}`:""}`);
-      await loadContext(false);
-    }catch(e){
-      showPage("建立失敗：" + e.message,"error");
-    }
-  }
-
-  async function loadDashboard(){
-    currentSelf = await selfDetail();
-
-    if(currentSelf.business_role === "member"){
-      await supabaseClient.auth.signOut();
-      showOnly("login");
-      setStatus(document.getElementById("loginStatus"),"此帳號不使用管理中心","error",false);
-      return;
-    }
-
-    if(currentSelf.must_change_password && !currentSelf.is_platform_owner){
-      showOnly("claim");
-      return;
-    }
-
-    document.getElementById("currentName").textContent = currentSelf.display_name || currentSelf.account || "—";
-    document.getElementById("currentRole").textContent = "｜" + (currentSelf.role_name || ROLE_LABEL[currentSelf.business_role] || "");
-
-    contextStack = [currentSelf];
-    showOnly("dashboard");
-    await loadContext();
-  }
-
-  async function login(){
-    const account = loginEmail(document.getElementById("loginAccount").value);
-    const password = document.getElementById("loginPassword").value;
-    const status = document.getElementById("loginStatus");
-    status.style.display = "none";
-
-    if(!account || !password){
-      setStatus(status,"請輸入帳號與密碼","error",false);
-      return;
-    }
-
-    try{
-      const {data, error} = await supabaseClient.auth.signInWithPassword({email:account,password});
-      if(error) throw error;
-      currentUser = data.user;
-      await loadDashboard();
-    }catch(e){
-      setStatus(status,"登入失敗：" + e.message,"error",false);
-    }
-  }
-
-  async function claimPassword(){
-    const p1 = document.getElementById("claimPassword1").value;
-    const p2 = document.getElementById("claimPassword2").value;
-    const status = document.getElementById("claimStatus");
-
-    try{
-      validateAccountLike(p1,"密碼");
-      if(p1 !== p2) throw new Error("兩次輸入的密碼不一致");
-      const result = await api("/claim-password",{new_password:p1});
-      setStatus(status,"✓ 密碼設定成功，正在返回登入畫面…","success",false);
-      setTimeout(async () => {
-        await supabaseClient.auth.signOut();
-        currentUser = null;
-        document.getElementById("loginPassword").value = "";
-        showOnly("login");
-      },1200);
-    }catch(e){
-      setStatus(status,"設定失敗：" + e.message,"error",false);
-    }
-  }
-
-  function openSelfName(){
-    const panel = document.getElementById("selfPanel");
-    panel.style.display = "block";
-    panel.innerHTML = `
-      <h3>修改我的名稱</h3>
-      <label>新名稱</label>
-      <input class="self-name" type="text" value="${escapeHtml(currentSelf.display_name || "")}" />
-      <div class="panel-actions">
-        <button class="secondary self-cancel" type="button">取消</button>
-        <button class="primary self-save" type="button">確認修改</button>
-      </div>
-    `;
-    panel.querySelector(".self-cancel").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML="";});
-    panel.querySelector(".self-save").addEventListener("click",async()=>{
-      const value = panel.querySelector(".self-name").value.trim();
-      try{
-        if(!value) throw new Error("名稱不能空白");
-        await api("/update-display-name",{target_user_id:currentUser.id,display_name:value});
-        currentSelf.display_name = value;
-        document.getElementById("currentName").textContent = value;
-        panel.style.display="none"; panel.innerHTML="";
-        showPage("✓ 名稱修改成功");
-      }catch(e){ showPage("修改失敗：" + e.message,"error"); }
-    });
-  }
-
-  function openSelfPassword(){
-    const panel = document.getElementById("selfPanel");
-    panel.style.display = "block";
-    panel.innerHTML = `
-      <h3>修改我的密碼</h3>
-      <div class="grid">
-        <div><label>新密碼</label><input class="sp1" type="password" autocomplete="new-password" /></div>
-        <div><label>再次輸入</label><input class="sp2" type="password" autocomplete="new-password" /></div>
-      </div>
-      <div class="panel-actions">
-        <button class="secondary self-cancel" type="button">取消</button>
-        <button class="primary self-save" type="button">確認修改</button>
-      </div>
-    `;
-    panel.querySelector(".self-cancel").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML="";});
-    panel.querySelector(".self-save").addEventListener("click",async()=>{
-      const p1=panel.querySelector(".sp1").value, p2=panel.querySelector(".sp2").value;
-      try{
-        validateAccountLike(p1,"密碼");
-        if(p1!==p2) throw new Error("兩次輸入的密碼不一致");
-        await api("/reset-password",{target_user_id:currentUser.id,new_password:p1});
-        panel.style.display="none"; panel.innerHTML="";
-        showPage("✓ 密碼修改成功，請重新登入");
-        setTimeout(async()=>{await supabaseClient.auth.signOut(); showOnly("login");},1200);
-      }catch(e){ showPage("修改失敗：" + e.message,"error"); }
-    });
-  }
-
-  document.getElementById("loginBtn").addEventListener("click",login);
-  document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter") login();});
-  document.getElementById("claimBtn").addEventListener("click",claimPassword);
-
-  document.getElementById("logoutBtn").addEventListener("click",async()=>{
-    await supabaseClient.auth.signOut();
-    currentUser=null; currentSelf=null; currentChildren=[]; contextStack=[];
-    document.getElementById("loginPassword").value="";
-    showOnly("login");
   });
 
-  document.getElementById("myNameBtn").addEventListener("click",openSelfName);
-  document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
-
-  document.getElementById("openCreateBtn").addEventListener("click",()=>{
-    document.querySelectorAll(".account-manager").forEach(x=>x.remove());
-    resetCreateForm();
-    document.getElementById("createPanel").style.display="block";
+  manager.querySelector(".time-menu").addEventListener("click",()=>{
+    host.innerHTML=`<div class="subpanel"><h4>使用時間管理${readonly?"（查看）":""}</h4><p class="reserved">使用時間的開始、到期、星期與每日時段規則尚未定稿；此位置已保留。跨層帳號固定只能查看。</p></div>`;
   });
 
-  document.getElementById("cancelCreateBtn").addEventListener("click",()=>{
-    document.getElementById("createPanel").style.display="none";
-    resetCreateForm();
+  manager.querySelector(".name-menu")?.addEventListener("click",()=>{
+    host.innerHTML=`<div class="subpanel"><h4>修改名稱</h4><label>新名稱</label><input class="name-input" type="text" maxlength="50" value="${escapeHtml(detail.display_name||"")}"><div class="local-status status"></div><div class="panel-actions"><button class="primary save-name" type="button">確認修改</button></div></div>`;
+    host.querySelector(".save-name").addEventListener("click",async()=>{
+      const value=host.querySelector(".name-input").value.trim();
+      if(!value){localStatus(host,"名稱不能空白");return}
+      try{await api("/update-display-name",{target_user_id:child.user_id,display_name:value});manager.remove();rowSuccess(row,"✓ 名稱修改成功");await loadContext(false)}
+      catch(e){localStatus(host,translateError(e.message))}
+    });
   });
 
-  document.getElementById("createBtn").addEventListener("click",createAccount);
-
-  document.getElementById("newRole").addEventListener("change",e=>{
-    const member=e.target.value==="member";
-    document.getElementById("initialQuotaWrap").style.display=member?"none":"block";
-    if(member) document.getElementById("initialQuota").value="0";
+  manager.querySelector(".password-menu")?.addEventListener("click",()=>{
+    host.innerHTML=`<div class="subpanel"><h4>重設密碼</h4><div class="hint">6–11字元，小寫英文＋至少五個數字</div><div class="grid">
+      <div><label>新密碼</label><div class="password-wrap"><input id="mgrP1-${detail.user_id}" class="p1" type="password" autocomplete="new-password"><button class="eye-btn" type="button" data-toggle-password="#mgrP1-${detail.user_id}">👁</button></div></div>
+      <div><label>再次輸入</label><div class="password-wrap"><input id="mgrP2-${detail.user_id}" class="p2" type="password" autocomplete="new-password"><button class="eye-btn" type="button" data-toggle-password="#mgrP2-${detail.user_id}">👁</button></div></div>
+      </div><div class="local-status status"></div><div class="panel-actions"><button class="primary save-password" type="button">確認重設</button></div></div>`;
+    bindPasswordToggles(host);
+    host.querySelector(".save-password").addEventListener("click",async()=>{
+      const p1=host.querySelector(".p1").value,p2=host.querySelector(".p2").value;
+      try{validateAccountLike(p1,"密碼");if(p1!==p2)throw new Error("兩次輸入的密碼不一致");await api("/reset-password",{target_user_id:child.user_id,new_password:p1});manager.remove();rowSuccess(row,"✓ 密碼重設成功；下次登入需重新設定密碼");await loadContext(false)}
+      catch(e){localStatus(host,translateError(e.message))}
+    });
   });
 
-  document.getElementById("accountSearch").addEventListener("input",renderChildren);
-
-  document.getElementById("backBtn").addEventListener("click",async()=>{
-    if(contextStack.length<=1) return;
-    closeTransientPanels();
-    contextStack.pop();
-    await loadContext();
+  manager.querySelector(".toggle-menu")?.addEventListener("click",async()=>{
+    const enabling=!detail.is_enabled;
+    if(!confirm(`${enabling?"啟用":"停用"}「${detail.display_name||detail.account}」及其所有下屬帳號？`))return;
+    try{await api("/set-account-enabled",{target_user_id:child.user_id,enabled:enabling});manager.remove();rowSuccess(row,enabling?"✓ 帳號及所有下屬已啟用":"✓ 帳號及所有下屬已停用");await loadContext(false)}
+    catch(e){localStatus(host,translateError(e.message))}
   });
 
-  async function restore(){
-    const {data:{session}} = await supabaseClient.auth.getSession();
-    if(!session?.user){ showOnly("login"); return; }
-    currentUser=session.user;
-    try{ await loadDashboard(); }
-    catch(e){
-      await supabaseClient.auth.signOut();
-      showOnly("login");
-      setStatus(document.getElementById("loginStatus"),"無法進入管理中心：" + e.message,"error",false);
-    }
+  manager.querySelector(".delete-menu")?.addEventListener("click",async()=>{
+    const plan=detail.delete_plan||{},count=Number(plan.account_count||1);
+    const text=count>1?`此操作將永久刪除「${detail.display_name||detail.account}」及其所有下屬，共 ${count} 個帳號。\n\n刪除後無法復原。`:`確定永久刪除「${detail.display_name||detail.account}」？\n\n刪除後無法復原。`;
+    if(!confirm(text))return;
+    try{const result=await api("/delete-account",{target_user_id:child.user_id});manager.remove();rowSuccess(row,"✓ "+(result.message||"帳號刪除成功"));await loadContext(false)}
+    catch(e){localStatus(host,translateError(e.message))}
+  });
+}
+
+async function loadContext(closePanels=true){
+  if(closePanels)closeAllPanels();
+  let ctx=contextStack.at(-1);
+  const {data:detail,error:detailError}=await supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:ctx.user_id});
+  if(!detailError&&detail){ctx={...ctx,...detail};contextStack[contextStack.length-1]=ctx}
+  renderContextHeader();
+  document.getElementById("childList").innerHTML='<div class="empty">載入中…</div>';
+  const {data,error}=await supabaseClient.rpc("hv_admin_list_children_v3",{p_parent_user_id:ctx.user_id});
+  if(error){
+    if(String(error.message||"").includes("停用")){await handleDisabled();return}
+    document.getElementById("childList").innerHTML=`<div class="empty">載入失敗：${escapeHtml(translateError(error.message))}</div>`;return
   }
+  currentChildren=Array.isArray(data)?data:[];
+  createAllowedRoles=await allowedRolesFor(ctx.user_id);
+  const canCreate=await canActAsParent(ctx.user_id);
+  document.getElementById("openCreateBtn").style.display=canCreate&&createAllowedRoles.length?"inline-block":"none";
+  populateRoleSelect();renderChildren();
+}
+function populateRoleSelect(){
+  const sel=document.getElementById("newRole");
+  sel.innerHTML='<option value="">請選擇層級</option>'+createAllowedRoles.map(r=>`<option value="${r}">${ROLE_LABEL[r]||r}</option>`).join("");
+}
+async function createAccount(){
+  const ctx=contextStack.at(-1),name=document.getElementById("newName").value.trim(),account=document.getElementById("newAccount").value.trim(),password=document.getElementById("newPassword").value,role=document.getElementById("newRole").value;
+  const quota=["member","co_admin"].includes(role)?0:Number(document.getElementById("initialQuota").value||0);
+  const status=document.getElementById("createStatus");
+  try{
+    if(!name)throw new Error("請輸入名稱");validateAccountLike(account,"帳號");validateAccountLike(password,"密碼");if(!role)throw new Error("請選擇商業層級");if(!Number.isInteger(quota)||quota<0)throw new Error("初始額度必須是0以上整數");
+    await api("/create-account",{parent_user_id:ctx.user_id,display_name:name,account,password,business_role:role,initial_quota:quota});
+    document.getElementById("createPanel").style.display="none";resetCreateForm();showPage(role==="member"?"✓ 會員帳號建立成功":role==="co_admin"?"✓ 共同管理員建立成功":`✓ 帳號建立成功${quota>0?`，已分配額度 ${quota}`:""}`);await loadContext(false);
+  }catch(e){setStatus(status,"建立失敗："+translateError(e.message),"error",false)}
+}
 
-  restore();
+async function loadDashboard(){
+  currentSelf=await selfDetail();
+  if(currentSelf.business_role==="member"){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"會員不使用管理中心","error",false);return}
+  if(currentSelf.must_change_password&&!currentSelf.is_platform_owner){showOnly("claim");return}
+  document.getElementById("currentName").textContent=currentSelf.display_name||currentSelf.account||"—";
+  document.getElementById("currentRole").textContent="｜"+(currentSelf.role_name||ROLE_LABEL[currentSelf.business_role]||"");
+  document.getElementById("currentStatus").textContent=currentSelf.is_enabled?"啟用中":"🚫 已停用";
+  const root=await rootContext();contextStack=[root];showOnly("dashboard");startSessionWatch();await loadContext();
+}
+async function login(){
+  const account=loginEmail(document.getElementById("loginAccount").value),password=document.getElementById("loginPassword").value,status=document.getElementById("loginStatus");status.style.display="none";
+  if(!account||!password){setStatus(status,"請輸入帳號與密碼","error",false);return}
+  try{
+    const {data,error}=await supabaseClient.auth.signInWithPassword({email:account,password});if(error)throw error;currentUser=data.user;await loadDashboard();
+  }catch(e){await supabaseClient.auth.signOut().catch(()=>{});setStatus(status,"登入失敗："+translateError(e.message),"error",false)}
+}
+async function claimPassword(){
+  const p1=document.getElementById("claimPassword1").value,p2=document.getElementById("claimPassword2").value,status=document.getElementById("claimStatus");
+  try{validateAccountLike(p1,"密碼");if(p1!==p2)throw new Error("兩次輸入的密碼不一致");await api("/claim-password",{new_password:p1});setStatus(status,"✓ 密碼設定成功，正在返回登入畫面…","success",false);setTimeout(async()=>{await supabaseClient.auth.signOut();currentUser=null;showOnly("login")},1200)}
+  catch(e){setStatus(status,"設定失敗："+translateError(e.message),"error",false)}
+}
+function openSelfName(){
+  closeAllPanels();const panel=document.getElementById("selfPanel");panel.style.display="block";
+  panel.innerHTML=`<h3>修改我的名稱</h3><label>新名稱</label><input class="self-name" type="text" value="${escapeHtml(currentSelf.display_name||"")}"><div class="local-status status"></div><div class="panel-actions"><button class="secondary self-cancel" type="button">取消</button><button class="primary self-save" type="button">確認修改</button></div>`;
+  panel.querySelector(".self-cancel").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
+  panel.querySelector(".self-save").addEventListener("click",async()=>{
+    const value=panel.querySelector(".self-name").value.trim();if(!value){localStatus(panel,"名稱不能空白");return}
+    try{await api("/update-display-name",{target_user_id:currentUser.id,display_name:value});currentSelf.display_name=value;document.getElementById("currentName").textContent=value;panel.style.display="none";panel.innerHTML="";showPage("✓ 名稱修改成功")}
+    catch(e){localStatus(panel,"修改失敗："+translateError(e.message))}
+  });
+}
+function openSelfPassword(){
+  closeAllPanels();const panel=document.getElementById("selfPanel");panel.style.display="block";
+  panel.innerHTML=`<h3>修改我的密碼</h3><div class="hint">6–11字元，小寫英文＋至少五個數字</div><div class="grid">
+    <div><label>新密碼</label><div class="password-wrap"><input id="selfP1" class="sp1" type="password" autocomplete="new-password"><button class="eye-btn" type="button" data-toggle-password="#selfP1">👁</button></div></div>
+    <div><label>再次輸入</label><div class="password-wrap"><input id="selfP2" class="sp2" type="password" autocomplete="new-password"><button class="eye-btn" type="button" data-toggle-password="#selfP2">👁</button></div></div>
+    </div><div class="local-status status"></div><div class="panel-actions"><button class="secondary self-cancel" type="button">取消</button><button class="primary self-save" type="button">確認修改</button></div>`;
+  bindPasswordToggles(panel);
+  panel.querySelector(".self-cancel").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
+  panel.querySelector(".self-save").addEventListener("click",async()=>{
+    const p1=panel.querySelector(".sp1").value,p2=panel.querySelector(".sp2").value;
+    try{validateAccountLike(p1,"密碼");if(p1!==p2)throw new Error("兩次輸入的密碼不一致");await api("/reset-password",{target_user_id:currentUser.id,new_password:p1});panel.style.display="none";panel.innerHTML="";showPage("✓ 密碼修改成功，請重新登入");setTimeout(async()=>{await supabaseClient.auth.signOut();showOnly("login")},1200)}
+    catch(e){localStatus(panel,"修改失敗："+translateError(e.message))}
+  });
+}
+
+document.getElementById("loginBtn").addEventListener("click",login);
+document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+document.getElementById("claimBtn").addEventListener("click",claimPassword);
+document.getElementById("logoutBtn").addEventListener("click",async()=>{if(sessionWatch)clearInterval(sessionWatch);await supabaseClient.auth.signOut();currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];showOnly("login")});
+document.getElementById("myNameBtn").addEventListener("click",openSelfName);
+document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
+document.getElementById("openCreateBtn").addEventListener("click",()=>{
+  document.getElementById("selfPanel").style.display="none";document.getElementById("selfPanel").innerHTML="";document.querySelectorAll(".account-manager").forEach(x=>x.remove());resetCreateForm();document.getElementById("createPanel").style.display="block";
+});
+document.getElementById("cancelCreateBtn").addEventListener("click",()=>{document.getElementById("createPanel").style.display="none";resetCreateForm()});
+document.getElementById("createBtn").addEventListener("click",createAccount);
+document.getElementById("newRole").addEventListener("change",e=>{
+  const noQuota=["member","co_admin"].includes(e.target.value);document.getElementById("initialQuotaWrap").style.display=noQuota?"none":"block";if(noQuota)document.getElementById("initialQuota").value="0";
+});
+document.getElementById("accountSearch").addEventListener("input",renderChildren);
+document.getElementById("backBtn").addEventListener("click",async()=>{if(contextStack.length<=1)return;closeAllPanels();contextStack.pop();await loadContext(false)});
+document.getElementById("homeBtn").addEventListener("click",async()=>{if(contextStack.length<=1)return;closeAllPanels();contextStack=contextStack.slice(0,1);await loadContext(false)});
+
+async function restore(){
+  const {data:{session}}=await supabaseClient.auth.getSession();
+  if(!session?.user){showOnly("login");return}
+  currentUser=session.user;
+  try{await loadDashboard()}
+  catch(e){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"無法進入管理中心："+translateError(e.message),"error",false)}
+}
+restore();
 </script>
 </body>
 </html>
