@@ -77,11 +77,31 @@ button:disabled{opacity:.5;cursor:not-allowed}
   .context-line{align-items:flex-start}.nav-actions{width:100%}.nav-actions button{flex:1}
 }
 </style>
+
+<style>
+.hv-return-btn{
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 16px;
+  border-radius:12px;
+  background:#eef2f7;
+  color:#334155;
+  border:1px solid #cbd5e1;
+  font-weight:800;
+  box-shadow:0 2px 8px rgba(15,23,42,.08);
+  transition:background .15s ease,border-color .15s ease,transform .15s ease;
+}
+.hv-return-btn:hover{background:#e2e8f0;border-color:#94a3b8}
+.hv-return-btn:active{transform:translateY(1px)}
+</style>
+
 </head>
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v1.8.1</div>
+  <div class="version">Admin Center v1.8.4</div>
 </header>
 
 <main>
@@ -128,7 +148,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <div class="top-actions">
       <button id="myNameBtn" class="soft-cyan" type="button">修改我的名稱</button>
       <button id="myPasswordBtn" class="soft" type="button">修改我的密碼</button>
-      <a id="hawkvisionHomeBtn" class="secondary" href="https://hawkvisionai.com/" style="text-decoration:none;display:inline-flex;align-items:center">返回 HawkVision</a><button id="logoutBtn" class="secondary" type="button">登出</button>
+      <a id="hawkvisionHomeBtn" class="secondary hv-return-btn" href="https://hawkvisionai.com/">返回</a><button id="logoutBtn" class="secondary" type="button">登出</button>
     </div>
   </div>
 
