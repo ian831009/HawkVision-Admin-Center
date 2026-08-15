@@ -85,7 +85,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 </header>
 
 <main>
-<section id="loginSection" class="login-card">
+<section id="loginSection" class="login-card" style="display:none" aria-hidden="true">
   <h2>管理員登入</h2>
   <label for="loginAccount">帳號</label>
   <input id="loginAccount" type="text" autocomplete="username" placeholder="請輸入帳號" />
@@ -602,7 +602,7 @@ function openSelfPassword(){
 document.getElementById("loginBtn").addEventListener("click",login);
 document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
 document.getElementById("claimBtn").addEventListener("click",claimPassword);
-document.getElementById("logoutBtn").addEventListener("click",async()=>{if(sessionWatch)clearInterval(sessionWatch);await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});hvClearActiveUser();currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];window.location.href="https://hawkvisionai.com/"});
+document.getElementById("logoutBtn").addEventListener("click",async()=>{if(sessionWatch)clearInterval(sessionWatch);await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});hvClearActiveUser();currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];window.location.replace("https://hawkvisionai.com/?logout=1")});
 document.getElementById("myNameBtn").addEventListener("click",openSelfName);
 document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
 document.getElementById("openCreateBtn").addEventListener("click",()=>{
@@ -619,7 +619,7 @@ document.getElementById("homeBtn").addEventListener("click",async()=>{if(context
 
 async function restore(){
   const {data:{session}}=await supabaseClient.auth.getSession();
-  if(!session?.user){showOnly("login");return}
+  if(!session?.user){window.location.replace("https://hawkvisionai.com/");return}
   currentUser=session.user;
   try{await loadDashboard()}
   catch(e){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"無法進入管理中心："+translateError(e.message),"error",false)}
