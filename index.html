@@ -120,7 +120,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.0.1</div>
+  <div class="version">Admin Center v2.0.2</div>
 </header>
 
 <main>
@@ -298,17 +298,21 @@ function loginEmail(raw){const v=String(raw||"").trim().toLowerCase();return v.i
 function validateAccountLike(v,label){if(!ACCOUNT_PASSWORD_RE.test(String(v||"")))throw new Error(`${label}必須為6–11字元，只能使用小寫英文與數字，至少1個小寫英文字母及至少5個數字`)}
 
 function translateError(message){
-  const m=String(message||"").trim();
-  const lower=m.toLowerCase();
-  if(lower.includes("invalid login credentials"))return `帳號或密碼錯誤（${m}）`;
-  if(lower.includes("user already registered")||lower.includes("already been registered")||lower.includes("duplicate key"))return `此帳號已經存在，請更換其他帳號（${m}）`;
-  if(lower.includes("email rate limit"))return `操作過於頻繁，請稍後再試（${m}）`;
-  if(lower.includes("failed to fetch")||lower.includes("network"))return `目前無法連接伺服器，請稍後再試（${m}）`;
-  if(lower.includes("jwt")||lower.includes("token")||lower.includes("session"))return `登入狀態已失效，請重新登入（${m}）`;
-  if(lower.includes("permission")||lower.includes("not authorized")||lower.includes("row-level security"))return `你沒有執行此操作的權限（${m}）`;
-  return m||"操作失敗";
+  const raw=String(message||"").trim();
+  const m=raw.toLowerCase();
+  if(!raw)return "操作失敗，請稍後再試";
+  if(m.includes("foreign key constraint")||m.includes("violates foreign key"))return "帳號仍有歷史資料關聯，系統尚未完成刪除處理，請重新整理後再試";
+  if(m.includes("invalid login credentials"))return "帳號或密碼錯誤";
+  if(m.includes("user already registered")||m.includes("already been registered")||m.includes("duplicate key"))return "此帳號已經存在，請更換其他帳號";
+  if(m.includes("email rate limit"))return "操作過於頻繁，請稍後再試";
+  if(m.includes("failed to fetch")||m.includes("network")||m.includes("fetch failed"))return "目前無法連接伺服器，請稍後再試";
+  if(m.includes("jwt")||m.includes("token")||m.includes("session"))return "登入狀態已失效，請重新登入";
+  if(m.includes("permission")||m.includes("not authorized")||m.includes("row-level security"))return "你沒有執行此操作的權限";
+  if(m.includes("timeout")||m.includes("statement timeout"))return "系統處理逾時，請稍後再試";
+  if(/^[\x00-\x7F\s\W]+$/.test(raw))return "系統發生錯誤，請稍後再試";
+  return raw;
 }
-function setStatus(el,msg,type="success",auto=false){
+function setStatus(el,msg,type="success",auto=true){
   el.textContent=msg;el.className=`status ${type}`;el.style.display="block";
   if(auto)setTimeout(()=>{el.style.display="none";el.textContent=""},3000);
 }
@@ -328,6 +332,29 @@ function bindPasswordToggles(scope=document){
   });
 }
 bindPasswordToggles();
+
+function installTransientMessageObserver(){
+  const arm=(el)=>{
+    if(!el || el.dataset.hvTransientArmed==="1")return;
+    if(!el.matches?.(".status.error,.status.success,.local-status"))return;
+    el.dataset.hvTransientArmed="1";
+    setTimeout(()=>{
+      el.style.display="none";
+      el.textContent="";
+      el.dataset.hvTransientArmed="0";
+    },3000);
+  };
+  document.querySelectorAll(".status.error,.status.success,.local-status").forEach(arm);
+  new MutationObserver(muts=>{
+    muts.forEach(m=>m.addedNodes.forEach(n=>{
+      if(n.nodeType!==1)return;
+      arm(n);
+      n.querySelectorAll?.(".status.error,.status.success,.local-status").forEach(arm);
+    }));
+  }).observe(document.body,{childList:true,subtree:true});
+}
+installTransientMessageObserver();
+
 
 async function token(){
   const {data:{session},error}=await supabaseClient.auth.getSession();
@@ -367,7 +394,7 @@ async function handleDisabled(){
   await supabaseClient.auth.signOut().catch(()=>{});
   currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];
   showOnly("login");
-  setStatus(document.getElementById("loginStatus"),"此帳號目前已停用，無法使用管理中心","error",false);
+  setStatus(document.getElementById("loginStatus"),"此帳號目前已停用，無法使用管理中心","error",true);
 }
 function startSessionWatch(){
   if(sessionWatch)clearInterval(sessionWatch);
@@ -457,7 +484,7 @@ function renderChildren(){
     row.querySelector(".enter-btn")?.addEventListener("click",async()=>{clearAccountSearch();closeAllPanels();contextStack.push(child);await loadContext(false)});
   }
 }
-function localStatus(host,msg,type="error"){let el=host.querySelector(".local-status");if(!el){el=document.createElement("div");el.className="status local-status";host.appendChild(el)}setStatus(el,msg,type,false)}
+function localStatus(host,msg,type="error"){let el=host.querySelector(".local-status");if(!el){el=document.createElement("div");el.className="status local-status";host.appendChild(el)}setStatus(el,translateError(msg),type,true)}
 function rowSuccess(row,msg){
   const el=document.createElement("div");el.className="status success";el.style.display="block";el.textContent=msg;row.appendChild(el);
   setTimeout(()=>el.remove(),3000);
@@ -691,7 +718,7 @@ async function createAccount(){
     if(!name)throw new Error("請輸入名稱");validateAccountLike(account,"帳號");validateAccountLike(password,"密碼");if(!role)throw new Error("請選擇商業層級");if(!Number.isInteger(quota)||quota<0)throw new Error("初始額度必須是0以上整數");
     await api("/create-account",{parent_user_id:ctx.user_id,display_name:name,account,password,business_role:role,initial_quota:quota});
     document.getElementById("createPanel").style.display="none";resetCreateForm();showPage(role==="member"?"✓ 會員帳號建立成功":role==="co_admin"?"✓ 共同管理員建立成功":`✓ 帳號建立成功${quota>0?`，已分配額度 ${quota}`:""}`);await loadContext(false);
-  }catch(e){setStatus(status,"建立失敗："+translateError(e.message),"error",false)}
+  }catch(e){setStatus(status,"建立失敗："+translateError(e.message),"error",true)}
 }
 
 async function loadDashboard(){
@@ -700,7 +727,7 @@ async function loadDashboard(){
   if(hasAdminAccess!==true){await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});throw new Error("此帳號沒有管理中心使用權限");}
 
   currentSelf=await selfDetail();
-  if(currentSelf.business_role==="member"){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"會員不使用管理中心","error",false);return}
+  if(currentSelf.business_role==="member"){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"會員不使用管理中心","error",true);return}
   if(currentSelf.must_change_password&&!currentSelf.is_platform_owner){showOnly("claim");return}
   document.getElementById("currentName").textContent=currentSelf.display_name||currentSelf.account||"—";
   document.getElementById("currentRole").textContent="｜"+(currentSelf.role_name||ROLE_LABEL[currentSelf.business_role]||"");
@@ -709,15 +736,15 @@ async function loadDashboard(){
 }
 async function login(){
   const account=loginEmail(document.getElementById("loginAccount").value),password=document.getElementById("loginPassword").value,status=document.getElementById("loginStatus");status.style.display="none";
-  if(!account||!password){setStatus(status,"請輸入帳號與密碼","error",false);return}
+  if(!account||!password){setStatus(status,"請輸入帳號與密碼","error",true);return}
   try{
     const {data,error}=await supabaseClient.auth.signInWithPassword({email:account,password});if(error)throw error;currentUser=data.user;await loadDashboard();
-  }catch(e){await supabaseClient.auth.signOut().catch(()=>{});setStatus(status,"登入失敗："+translateError(e.message),"error",false)}
+  }catch(e){await supabaseClient.auth.signOut().catch(()=>{});setStatus(status,"登入失敗："+translateError(e.message),"error",true)}
 }
 async function claimPassword(){
   const p1=document.getElementById("claimPassword1").value,p2=document.getElementById("claimPassword2").value,status=document.getElementById("claimStatus");
-  try{validateAccountLike(p1,"密碼");if(p1!==p2)throw new Error("兩次輸入的密碼不一致");await api("/claim-password",{new_password:p1});setStatus(status,"✓ 密碼設定成功，正在返回登入畫面…","success",false);setTimeout(async()=>{await supabaseClient.auth.signOut();currentUser=null;showOnly("login")},1200)}
-  catch(e){setStatus(status,"設定失敗："+translateError(e.message),"error",false)}
+  try{validateAccountLike(p1,"密碼");if(p1!==p2)throw new Error("兩次輸入的密碼不一致");await api("/claim-password",{new_password:p1});setStatus(status,"✓ 密碼設定成功，正在返回登入畫面…","success",true);setTimeout(async()=>{await supabaseClient.auth.signOut();currentUser=null;showOnly("login")},1200)}
+  catch(e){setStatus(status,"設定失敗："+translateError(e.message),"error",true)}
 }
 
 const AUDIT_LABELS={
@@ -859,7 +886,7 @@ async function restore(){
   if(!session?.user){window.location.replace("https://hawkvisionai.com/");return}
   currentUser=session.user;
   try{await loadDashboard()}
-  catch(e){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"無法進入管理中心："+translateError(e.message),"error",false)}
+  catch(e){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"無法進入管理中心："+translateError(e.message),"error",true)}
 }
 (async()=>{
   await hvAcceptSso(supabaseClient).catch(()=>{});
