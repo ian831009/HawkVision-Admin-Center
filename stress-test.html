@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>HawkVision Stress Lab v1.2.0</title>
+<title>HawkVision Stress Lab v1.3.0</title>
 <style>
 :root{
   --bg:#f3f6fb;--card:#fff;--line:#e2e8f0;--text:#0f172a;--muted:#64748b;
@@ -56,7 +56,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{p
     <div class="top">
       <div>
         <h1>HawkVision Stress Lab</h1>
-        <div class="ver">v1.2.0｜管理中心視覺模擬</div>
+        <div class="ver">v1.3.0｜管理中心視覺模擬</div>
       </div>
       <button id="logoutBtn" class="hidden">登出</button>
     </div>
@@ -175,7 +175,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{p
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const VERSION="1.2.0";
+const VERSION="1.3.0";
 const SUPABASE_URL="https://rwxujvpakpemiwkitltk.supabase.co";
 const SUPABASE_KEY="sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
@@ -327,38 +327,42 @@ $("seedAuditBtn").onclick=async()=>{
   try{
     const logs=Number($("logsPerNode").value);
     const total=Number(run.node_count)*logs;
-    if(logs===250&&!confirm(`這會建立約 ${total.toLocaleString()} 筆測試 Audit，將採分段建立以避免逾時。確定繼續？`))return;
+    if(logs===250&&!confirm(`這會建立約 ${total.toLocaleString()} 筆測試 Audit，將自動分批建立並在逾時時縮小批次。確定繼續？`))return;
 
     btn.disabled=true;
     $("auditProgress").textContent="";
     show($("auditStatus"),"正在建立測試 Audit，請勿關閉頁面…");
 
-    // Existing backend RPC rebuilds to a target logs-per-node count.
-    // Increase the target gradually so each statement is much smaller than one 250-log jump.
-    const targets=[];
-    const step = logs >= 250 ? 20 : (logs >= 50 ? 10 : logs);
-    for(let t=step;t<logs;t+=step) targets.push(t);
-    if(!targets.length || targets.at(-1)!==logs) targets.push(logs);
+    let current=Math.floor(Number(run.audit_count||0)/Number(run.node_count||1));
+    current=Math.max(0,Math.min(current,logs));
+    let increment=5;
+    const minIncrement=1,maxIncrement=10;
+    let batchNo=0;
+    const started=performance.now();
 
-    let last=null, started=performance.now();
-    for(let i=0;i<targets.length;i++){
-      const target=targets[i];
-      $("auditProgress").textContent =
-        `建立進度：第 ${i+1} / ${targets.length} 批｜目標每帳號 ${target} 筆｜約 ${(Number(run.node_count)*target).toLocaleString()} 筆`;
-
+    while(current<logs){
+      const target=Math.min(logs,current+increment);
+      batchNo++;
+      $("auditProgress").textContent=
+        `建立進度：目前每帳號 ${current} / ${logs} 筆｜第 ${batchNo} 批嘗試 +${target-current} 筆｜約 ${(Number(run.node_count)*(target-current)).toLocaleString()} 筆`;
       try{
-        last=await timed(()=>rpc("hv_stress_seed_audit_pressure_v1",{
-          p_run_id:run.run_id,
-          p_logs_per_node:target
+        const r=await timed(()=>rpc("hv_stress_seed_audit_pressure_v1",{
+          p_run_id:run.run_id,p_logs_per_node:target
         }));
+        current=target;
+        run.audit_count=r.value.audit_count;
+        $("auditCount").textContent=Number(run.audit_count).toLocaleString();
+        if(increment<maxIncrement)increment=Math.min(maxIncrement,increment+1);
+        await sleep(100);
       }catch(e){
-        // If even a 20-log increment times out, stop safely and report in Chinese.
-        throw new Error(chineseError(e));
+        if(increment>minIncrement){
+          increment=Math.max(minIncrement,Math.floor(increment/2));
+          show($("auditStatus"),"單批資料量過大，已自動縮小批次並繼續。",true);
+          await sleep(250);
+          continue;
+        }
+        throw new Error("即使使用最小批次仍無法建立測試 Audit，請停止測試並檢查資料庫函式或逾時設定。");
       }
-
-      run.audit_count=last.value.audit_count;
-      $("auditCount").textContent=Number(run.audit_count).toLocaleString();
-      await sleep(80);
     }
 
     const ms=performance.now()-started;
@@ -366,9 +370,7 @@ $("seedAuditBtn").onclick=async()=>{
     show($("auditStatus"),`完成：${Number(run.audit_count).toLocaleString()} 筆 Audit｜總耗時 ${ms.toFixed(0)} ms`);
   }catch(e){
     show($("auditStatus"),chineseError(e),false);
-  }finally{
-    btn.disabled=false;
-  }
+  }finally{btn.disabled=false}
 };
 
 $("previewRetentionBtn").onclick=async()=>{
