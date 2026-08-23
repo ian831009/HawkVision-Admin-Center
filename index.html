@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.1</div>
+  <div class="version">Admin Center v2.3.2</div>
 </header>
 
 <main>
@@ -584,7 +584,7 @@ body{
       </div>
 
       <div id="createAdvancedOptions" class="create-advanced-options" style="display:none">
-        <div class="create-option-block">
+        <div id="createPermissionBlock" class="create-option-block">
           <div class="create-option-title">建立時開放權限（可複選）</div>
           <div id="createPermissionOptions" class="create-permission-list"><div class="hint">請先選擇商業層級</div></div>
         </div>
@@ -814,6 +814,8 @@ function resetCreateForm(){
   document.getElementById("initialQuota").value="0";
   document.getElementById("initialQuotaWrap").style.display="block";
   document.getElementById("createAdvancedOptions").style.display="none";
+  const permissionBlock=document.getElementById("createPermissionBlock");
+  if(permissionBlock)permissionBlock.style.display="block";
   document.getElementById("createPermissionOptions").innerHTML='<div class="hint">請先選擇商業層級</div>';
   ["createContractStartDate","createContractStartTime","createContractEndDate","createContractEndTime"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""});
   document.getElementById("createStatus").style.display="none";
@@ -1068,14 +1070,14 @@ async function renderManager(manager,child,row){
   const [{data,error},{data:takeoverPlan,error:takeoverError},{data:permissionPolicy,error:permissionPolicyError},{data:effectiveAccess,error:effectiveError}]=await Promise.all([
     supabaseClient.rpc("hv_admin_account_detail_v7",{p_target_user_id:child.user_id}),
     supabaseClient.rpc("hv_takeover_delete_plan_v6",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id}),
-    supabaseClient.rpc("hv_admin_product_access_v4",{p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_admin_product_access_v5",{p_target_user_id:child.user_id}),
     supabaseClient.rpc("hv_account_effective_status_v1",{p_user_id:child.user_id})
   ]);
   if(error){manager.innerHTML=`<div class="status error" style="display:block;">${escapeHtml(translateError(error.message))}</div>`;return}
   const detail={...child,...data},readonly=!detail.can_full_manage,noQuota=["member","co_admin"].includes(detail.business_role);
   detail.takeover_delete_plan=takeoverError?null:takeoverPlan;
   detail.permission_policy=permissionPolicyError?[]:(Array.isArray(permissionPolicy)?permissionPolicy:[]);
-  const showPermissionMenu=detail.permission_policy.length>0;
+  const showPermissionMenu=detail.business_role!=="member" && detail.permission_policy.length>0;
   manager.innerHTML=`<div class="manager-title"><strong>${escapeHtml(detail.display_name||"未命名")}｜${escapeHtml(detail.role_name||ROLE_LABEL[detail.business_role]||"")}</strong><button class="secondary close-manager" type="button">收起</button></div>
     <div class="status ${effectiveAccess?.allowed===true?"success":"error"}" style="display:block;margin-bottom:12px">目前有效狀態：${escapeHtml(effectiveError?"狀態讀取失敗":effectiveStatusLabel(effectiveAccess))}${effectiveAccess?.blocking_display_name&&effectiveAccess?.blocking_user_id!==detail.user_id?`<br><span class="hint">限制來源：${escapeHtml(effectiveAccess.blocking_display_name)}</span>`:""}</div>
     ${readonly?`<div class="readonly-note">目前為跨層查看模式：只能查看，不能異動。</div>`:""}
@@ -1165,7 +1167,7 @@ async function renderManager(manager,child,row){
   manager.querySelector(".permission-menu")?.addEventListener("click",async()=>{
     host.innerHTML='<div class="subpanel"><div class="empty">載入中…</div></div>';
     try{
-      const {data:products,error:productError}=await supabaseClient.rpc("hv_admin_product_access_v4",{p_target_user_id:detail.user_id});
+      const {data:products,error:productError}=await supabaseClient.rpc("hv_admin_product_access_v5",{p_target_user_id:detail.user_id});
       if(productError)throw productError;
       const rows=Array.isArray(products)?products:[];
       const canModify=rows.some(x=>x.can_modify===true);
@@ -1202,7 +1204,7 @@ async function renderManager(manager,child,row){
             const enabled=input.checked===true;
             if(!original || enabled===Boolean(original.is_enabled))continue;
 
-            const {error:mutationError}=await supabaseClient.rpc("hv_set_user_product_access_v4",{
+            const {error:mutationError}=await supabaseClient.rpc("hv_set_user_product_access_v5",{
               p_target_user_id:detail.user_id,
               p_product_key:key,
               p_enabled:enabled
@@ -1210,7 +1212,7 @@ async function renderManager(manager,child,row){
 
             if(mutationError){
               const {data:verifyRows,error:verifyError}=await supabaseClient.rpc(
-                "hv_admin_product_access_v4",
+                "hv_admin_product_access_v5",
                 {p_target_user_id:detail.user_id}
               );
               if(verifyError)throw mutationError;
@@ -1228,7 +1230,7 @@ async function renderManager(manager,child,row){
           // 成功後只做非關鍵的背景同步；失敗不影響成功訊息。
           try{
             const {data:fresh}=await supabaseClient.rpc(
-              "hv_admin_product_access_v4",
+              "hv_admin_product_access_v5",
               {p_target_user_id:detail.user_id}
             );
             for(const input of host.querySelectorAll(".product-switch")){
@@ -1240,7 +1242,7 @@ async function renderManager(manager,child,row){
           localStatus(host,e.message||e,"error");
           try{
             const {data:fresh}=await supabaseClient.rpc(
-              "hv_admin_product_access_v4",
+              "hv_admin_product_access_v5",
               {p_target_user_id:detail.user_id}
             );
             for(const input of host.querySelectorAll(".product-switch")){
@@ -1569,6 +1571,8 @@ async function loadCreateAdvancedOptions(role){
     return;
   }
   wrap.style.display="block";
+  const permissionBlock=document.getElementById("createPermissionBlock");
+  if(permissionBlock)permissionBlock.style.display=role==="member"?"none":"block";
   const scheduleBlock=document.getElementById("createScheduleBlock");
   if(scheduleBlock){
     if(role==="member"){
@@ -1589,9 +1593,14 @@ async function loadCreateAdvancedOptions(role){
         </div>`;
     }
   }
+  if(role==="member"){
+    list.innerHTML="";
+    return;
+  }
+
   list.innerHTML='<div class="hint">載入可授予權限…</div>';
   try{
-    const {data,error}=await supabaseClient.rpc("hv_grantable_products_for_new_account_v1",{
+    const {data,error}=await supabaseClient.rpc("hv_grantable_products_for_new_account_v2",{
       p_parent_user_id:ctx.user_id,
       p_target_role:role
     });
@@ -1641,7 +1650,7 @@ async function createAccount(){
     if(!role)throw new Error("請選擇商業層級");
     if(!Number.isInteger(quota)||quota<0)throw new Error("初始額度必須是0以上整數");
 
-    const product_keys=[...document.querySelectorAll(".create-product-check:checked")].map(x=>x.value);
+    const product_keys=role==="member"?[]:[...document.querySelectorAll(".create-product-check:checked")].map(x=>x.value);
     const schedule=collectCreateSchedule(role);
 
     const result=await api("/create-account",{
