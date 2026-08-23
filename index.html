@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.2.5</div>
+  <div class="version">Admin Center v2.2.7</div>
 </header>
 
 <main>
@@ -580,7 +580,7 @@ body{
           <div class="hint">6–11字元，小寫英文＋至少五個數字</div>
         </div>
         <div><label for="newRole">商業層級</label><select id="newRole"></select></div>
-        <div id="initialQuotaWrap"><label for="initialQuota">初始額度</label><input id="initialQuota" type="number" min="0" step="1" value="0" /></div>
+        <div id="initialQuotaWrap"><label for="initialQuota">初始可分配額度（選填）</label><input id="initialQuota" type="number" min="0" step="1" value="0" /></div>
       </div>
 
       <div id="createAdvancedOptions" class="create-advanced-options" style="display:none">
@@ -824,13 +824,13 @@ async function rootContext(){
 async function allowedRolesFor(parentId){
   const roles=[];
   for(const role of ROLE_ORDER){
-    const {data,error}=await supabaseClient.rpc("hv_can_create_role_for_parent_v2",{p_actor_user_id:currentUser.id,p_parent_user_id:parentId,p_target_role:role});
+    const {data,error}=await supabaseClient.rpc("hv_can_create_role_for_parent_v3",{p_actor_user_id:currentUser.id,p_parent_user_id:parentId,p_target_role:role});
     if(!error&&data===true)roles.push(role);
   }
   return roles;
 }
 async function canActAsParent(parentId){
-  const {data,error}=await supabaseClient.rpc("hv_can_act_as_parent_v2",{p_actor_user_id:currentUser.id,p_parent_user_id:parentId});
+  const {data,error}=await supabaseClient.rpc("hv_can_act_as_parent_v3",{p_actor_user_id:currentUser.id,p_parent_user_id:parentId});
   return !error&&data===true;
 }
 
@@ -922,6 +922,18 @@ function updateRowSummary(row,child){
   const account=row.querySelector(".child-account");
   if(account)account.textContent=`帳號：${child.account||"—"}`;
 }
+function scheduleManagerRefresh(manager,child,row,reopenSelector){
+  clearTimeout(manager?._autoRefreshTimer);
+  if(!manager)return;
+  manager._autoRefreshTimer=setTimeout(async()=>{
+    if(!manager.isConnected)return;
+    try{
+      await renderManager(manager,child,row);
+      const btn=reopenSelector?manager.querySelector(reopenSelector):null;
+      if(btn)btn.click();
+    }catch(_){}
+  },3050);
+}
 async function refreshChildDetailInPlace(manager,child,row){
   const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:child.user_id});
   if(error)throw error;
@@ -1008,6 +1020,7 @@ async function renderManager(manager,child,row){
       try{
         await api(action==="allocate"?"/allocate-quota":"/reclaim-quota",{owner_user_id:child.parent_id,target_user_id:child.user_id,amount,reason});
         localStatus(host,action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功","success");
+        scheduleManagerRefresh(manager,child,row,".quota-menu");
         try{
           const [{data:fresh},{data:ownerRemainingData}]=await Promise.all([
             supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:child.user_id}),
@@ -1095,6 +1108,7 @@ async function renderManager(manager,child,row){
           }
 
           localStatus(host,changed.length?"✓ 權限設定成功":"目前權限沒有變更","success");
+          scheduleManagerRefresh(manager,child,row,".permission-menu");
 
           // 成功後只做非關鍵的背景同步；失敗不影響成功訊息。
           try{
@@ -1169,6 +1183,7 @@ async function renderManager(manager,child,row){
           });
           if(error)throw error;
           localStatus(host,s?"✓ 合約時間設定成功":"✓ 已清除合約時間限制","success");
+          scheduleManagerRefresh(manager,child,row,".contract-menu");
           try{applyEffectiveStatusToRow(row,child,await getEffectiveStatus(detail.user_id))}catch(_){}
         }catch(e){localStatus(host,e.message||e,"error")}
       });
@@ -1189,6 +1204,7 @@ async function renderManager(manager,child,row){
           host.querySelector(".contract-end-time").value="";
 
           localStatus(host,"✓ 合約時間已清空，現在為無限期使用","success");
+          scheduleManagerRefresh(manager,child,row,".contract-menu");
           try{applyEffectiveStatusToRow(row,child,await getEffectiveStatus(detail.user_id))}catch(_){}
         }catch(e){localStatus(host,e.message||e,"error")}
       });
@@ -1281,6 +1297,7 @@ async function renderManager(manager,child,row){
         detail.display_name=value;
         updateRowSummary(row,child);
         localStatus(host,"✓ 名稱修改成功","success");
+        scheduleManagerRefresh(manager,child,row,".name-menu");
       }catch(e){
         // API 若回報錯誤，才讀正式資料確認是否其實已成功。
         try{
@@ -1318,6 +1335,7 @@ async function renderManager(manager,child,row){
         host.querySelector(".p1").value="";
         host.querySelector(".p2").value="";
         localStatus(host,"✓ 密碼重設成功；下次登入需重新設定密碼","success");
+        scheduleManagerRefresh(manager,child,row,".password-menu");
       }catch(e){localStatus(host,translateError(e.message))}
     });
   });
@@ -1355,6 +1373,7 @@ async function renderManager(manager,child,row){
         detail.is_enabled=enabling;
         updateRowSummary(row,child);
         localStatus(host,result.message||`✓ 帳號已${enabling?"啟用":"停用"}`,"success");
+        scheduleManagerRefresh(manager,child,row,".toggle-menu");
       }catch(e){localStatus(host,e.message||e,"error")}
     });
   });
