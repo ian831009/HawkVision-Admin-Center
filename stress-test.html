@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>HawkVision Stress Lab v1.1.0</title>
+<title>HawkVision Stress Lab v1.2.0</title>
 <style>
 :root{
   --bg:#f3f6fb;--card:#fff;--line:#e2e8f0;--text:#0f172a;--muted:#64748b;
@@ -56,7 +56,7 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{p
     <div class="top">
       <div>
         <h1>HawkVision Stress Lab</h1>
-        <div class="ver">v1.1.0｜管理中心視覺模擬</div>
+        <div class="ver">v1.2.0｜管理中心視覺模擬</div>
       </div>
       <button id="logoutBtn" class="hidden">登出</button>
     </div>
@@ -169,12 +169,13 @@ table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{p
       </div>
     </div>
     <div id="auditStatus" class="status"></div>
+    <div id="auditProgress" class="hint" style="margin-top:8px"></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const VERSION="1.1.0";
+const VERSION="1.2.0";
 const SUPABASE_URL="https://rwxujvpakpemiwkitltk.supabase.co";
 const SUPABASE_KEY="sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
@@ -186,6 +187,15 @@ const roleLabel={shareholder:"股東",master_agent:"總代理",agent:"代理",su
 function emailFor(v){v=v.trim();return v.includes("@")?v.toLowerCase():v+"@hawkvision.local"}
 function show(el,msg,ok=true){el.textContent=msg;el.className="status "+(ok?"ok":"err")}
 function hide(el){el.classList.add("hidden")}function unhide(el){el.classList.remove("hidden")}
+function chineseError(e){
+  const m=(e?.message||String(e||"")).toLowerCase();
+  if(m.includes("statement timeout")||m.includes("canceling statement")) return "建立大量測試資料逾時，系統將改用較小批次重試。";
+  if(m.includes("duplicate")||m.includes("unique")) return "測試資料重複，請先刪除本次測試後再重新建立。";
+  if(m.includes("network")||m.includes("fetch")) return "網路連線異常，請確認連線後再試。";
+  return "系統處理失敗，請稍後再試。";
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
 async function rpc(name,args={}){const {data,error}=await sb.rpc(name,args);if(error)throw error;return data}
 async function timed(fn){const a=performance.now();const value=await fn();return {value,ms:performance.now()-a}}
 function pct(arr,p){const a=[...arr].sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor((a.length-1)*p))]||0}
@@ -313,15 +323,52 @@ $("benchBtn").onclick=async()=>{
 
 $("seedAuditBtn").onclick=async()=>{
   if(!run)return;
+  const btn=$("seedAuditBtn");
   try{
     const logs=Number($("logsPerNode").value);
-    if(logs===250&&!confirm(`這會建立約 ${Number(run.node_count)*250} 筆測試 Audit，可能需要較久時間。確定繼續？`))return;
-    show($("auditStatus"),"正在重建測試 Audit…");
-    const r=await timed(()=>rpc("hv_stress_seed_audit_pressure_v1",{p_run_id:run.run_id,p_logs_per_node:logs}));
-    run.audit_count=r.value.audit_count;
-    $("auditCount").textContent=Number(run.audit_count).toLocaleString();
-    show($("auditStatus"),`完成：${Number(run.audit_count).toLocaleString()} 筆 Audit｜耗時 ${r.ms.toFixed(0)} ms`);
-  }catch(e){show($("auditStatus"),e.message||String(e),false)}
+    const total=Number(run.node_count)*logs;
+    if(logs===250&&!confirm(`這會建立約 ${total.toLocaleString()} 筆測試 Audit，將採分段建立以避免逾時。確定繼續？`))return;
+
+    btn.disabled=true;
+    $("auditProgress").textContent="";
+    show($("auditStatus"),"正在建立測試 Audit，請勿關閉頁面…");
+
+    // Existing backend RPC rebuilds to a target logs-per-node count.
+    // Increase the target gradually so each statement is much smaller than one 250-log jump.
+    const targets=[];
+    const step = logs >= 250 ? 20 : (logs >= 50 ? 10 : logs);
+    for(let t=step;t<logs;t+=step) targets.push(t);
+    if(!targets.length || targets.at(-1)!==logs) targets.push(logs);
+
+    let last=null, started=performance.now();
+    for(let i=0;i<targets.length;i++){
+      const target=targets[i];
+      $("auditProgress").textContent =
+        `建立進度：第 ${i+1} / ${targets.length} 批｜目標每帳號 ${target} 筆｜約 ${(Number(run.node_count)*target).toLocaleString()} 筆`;
+
+      try{
+        last=await timed(()=>rpc("hv_stress_seed_audit_pressure_v1",{
+          p_run_id:run.run_id,
+          p_logs_per_node:target
+        }));
+      }catch(e){
+        // If even a 20-log increment times out, stop safely and report in Chinese.
+        throw new Error(chineseError(e));
+      }
+
+      run.audit_count=last.value.audit_count;
+      $("auditCount").textContent=Number(run.audit_count).toLocaleString();
+      await sleep(80);
+    }
+
+    const ms=performance.now()-started;
+    $("auditProgress").textContent=`建立進度：100%｜${Number(run.audit_count).toLocaleString()} / ${total.toLocaleString()} 筆`;
+    show($("auditStatus"),`完成：${Number(run.audit_count).toLocaleString()} 筆 Audit｜總耗時 ${ms.toFixed(0)} ms`);
+  }catch(e){
+    show($("auditStatus"),chineseError(e),false);
+  }finally{
+    btn.disabled=false;
+  }
 };
 
 $("previewRetentionBtn").onclick=async()=>{
