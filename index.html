@@ -114,13 +114,35 @@ button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:700px){
   .weekday-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
+
+<style>
+.hv-toast{
+  position:fixed;
+  top:22px;
+  right:22px;
+  z-index:99999;
+  max-width:min(430px,calc(100vw - 32px));
+  padding:13px 16px;
+  border-radius:12px;
+  font-weight:800;
+  box-shadow:0 12px 34px rgba(15,23,42,.20);
+  border:1px solid transparent;
+  display:none;
+}
+.hv-toast.success{background:#ecfdf5;color:#166534;border-color:#86efac}
+.hv-toast.error{background:#fef2f2;color:#991b1b;border-color:#fca5a5}
+@media(max-width:700px){
+  .hv-toast{top:14px;left:16px;right:16px;max-width:none}
+}
+</style>
+
 </style>
 
 </head>
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.0.2</div>
+  <div class="version">Admin Center v2.0.3</div>
 </header>
 
 <main>
@@ -316,7 +338,24 @@ function setStatus(el,msg,type="success",auto=true){
   el.textContent=msg;el.className=`status ${type}`;el.style.display="block";
   if(auto)setTimeout(()=>{el.style.display="none";el.textContent=""},3000);
 }
-function showPage(msg,type="success"){setStatus(document.getElementById("pageStatus"),msg,type,true)}
+function notify(msg,type="success"){
+  let el=document.getElementById("hvToast");
+  if(!el){
+    el=document.createElement("div");
+    el.id="hvToast";
+    el.className="hv-toast";
+    document.body.appendChild(el);
+  }
+  clearTimeout(notify.timer);
+  el.textContent=type==="error"?translateError(msg):String(msg||"");
+  el.className=`hv-toast ${type}`;
+  el.style.display="block";
+  notify.timer=setTimeout(()=>{
+    el.style.display="none";
+    el.textContent="";
+  },3000);
+}
+function showPage(msg,type="success"){notify(msg,type)}
 function showOnly(which){loginSection.style.display=which==="login"?"block":"none";claimSection.style.display=which==="claim"?"block":"none";dashboard.style.display=which==="dashboard"?"block":"none"}
 
 function bindPasswordToggles(scope=document){
@@ -485,9 +524,32 @@ function renderChildren(){
   }
 }
 function localStatus(host,msg,type="error"){let el=host.querySelector(".local-status");if(!el){el=document.createElement("div");el.className="status local-status";host.appendChild(el)}setStatus(el,translateError(msg),type,true)}
-function rowSuccess(row,msg){
-  const el=document.createElement("div");el.className="status success";el.style.display="block";el.textContent=msg;row.appendChild(el);
-  setTimeout(()=>el.remove(),3000);
+function rowSuccess(row,msg){notify(msg,"success")}
+
+
+function updateRowSummary(row,child){
+  if(!row)return;
+  row.classList.toggle("disabled-account",child.is_enabled===false);
+  const title=row.querySelector(".child-title");
+  if(title){
+    title.innerHTML=`<span>${escapeHtml(child.display_name||"未命名")}</span><span class="badge ${child.is_cross_level?"direct":""}">${escapeHtml(roleText(child))}</span>${child.is_enabled?"":'<span class="badge disabled">🚫 已停用</span>'}`;
+  }
+  const account=row.querySelector(".child-account");
+  if(account)account.textContent=`帳號：${child.account||"—"}`;
+}
+async function refreshChildDetailInPlace(manager,child,row){
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:child.user_id});
+  if(error)throw error;
+  Object.assign(child,data||{});
+  updateRowSummary(row,child);
+  if(manager?.isConnected)await renderManager(manager,child,row);
+}
+async function refreshChildrenDataOnly(){
+  const ctx=contextStack.at(-1);
+  const {data,error}=await supabaseClient.rpc("hv_admin_list_children_v3",{p_parent_user_id:ctx.user_id});
+  if(error)throw error;
+  currentChildren=Array.isArray(data)?data:[];
+  renderChildren();
 }
 
 async function renderManager(manager,child,row){
@@ -531,7 +593,8 @@ async function renderManager(manager,child,row){
       if(!Number.isInteger(amount)||amount<=0){localStatus(host,"額度必須是大於0的整數");return}
       try{
         await api(action==="allocate"?"/allocate-quota":"/reclaim-quota",{owner_user_id:child.parent_id,target_user_id:child.user_id,amount,reason});
-        manager.remove();rowSuccess(row,action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功");await loadContext(false);
+        notify(action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功","success");
+        await refreshChildDetailInPlace(manager,child,row);
       }catch(e){localStatus(host,translateError(e.message))}
     };
     host.querySelector(".allocate-btn").addEventListener("click",()=>doQuota("allocate"));
@@ -647,8 +710,13 @@ async function renderManager(manager,child,row){
     host.querySelector(".save-name").addEventListener("click",async()=>{
       const value=host.querySelector(".name-input").value.trim();
       if(!value){localStatus(host,"名稱不能空白");return}
-      try{await api("/update-display-name",{target_user_id:child.user_id,display_name:value});manager.remove();rowSuccess(row,"✓ 名稱修改成功");await loadContext(false)}
-      catch(e){localStatus(host,translateError(e.message))}
+      try{
+        await api("/update-display-name",{target_user_id:child.user_id,display_name:value});
+        child.display_name=value;
+        updateRowSummary(row,child);
+        notify("✓ 名稱修改成功","success");
+        await refreshChildDetailInPlace(manager,child,row);
+      }catch(e){localStatus(host,translateError(e.message))}
     });
   });
 
@@ -660,16 +728,27 @@ async function renderManager(manager,child,row){
     bindPasswordToggles(host);
     host.querySelector(".save-password").addEventListener("click",async()=>{
       const p1=host.querySelector(".p1").value,p2=host.querySelector(".p2").value;
-      try{validateAccountLike(p1,"密碼");if(p1!==p2)throw new Error("兩次輸入的密碼不一致");await api("/reset-password",{target_user_id:child.user_id,new_password:p1});manager.remove();rowSuccess(row,"✓ 密碼重設成功；下次登入需重新設定密碼");await loadContext(false)}
-      catch(e){localStatus(host,translateError(e.message))}
+      try{
+        validateAccountLike(p1,"密碼");
+        if(p1!==p2)throw new Error("兩次輸入的密碼不一致");
+        await api("/reset-password",{target_user_id:child.user_id,new_password:p1});
+        host.querySelector(".p1").value="";
+        host.querySelector(".p2").value="";
+        notify("✓ 密碼重設成功；下次登入需重新設定密碼","success");
+      }catch(e){localStatus(host,translateError(e.message))}
     });
   });
 
   manager.querySelector(".toggle-menu")?.addEventListener("click",async()=>{
     const enabling=!detail.is_enabled;
     if(!confirm(`${enabling?"啟用":"停用"}「${detail.display_name||detail.account}」及其所有下屬帳號？`))return;
-    try{await api("/set-account-enabled",{target_user_id:child.user_id,enabled:enabling});manager.remove();rowSuccess(row,enabling?"✓ 帳號及所有下屬已啟用":"✓ 帳號及所有下屬已停用");await loadContext(false)}
-    catch(e){localStatus(host,translateError(e.message))}
+    try{
+      await api("/set-account-enabled",{target_user_id:child.user_id,enabled:enabling});
+      child.is_enabled=enabling;
+      updateRowSummary(row,child);
+      notify(enabling?"✓ 帳號及所有下屬已啟用":"✓ 帳號及所有下屬已停用","success");
+      await refreshChildDetailInPlace(manager,child,row);
+    }catch(e){localStatus(host,translateError(e.message))}
   });
 
   manager.querySelector(".delete-menu")?.addEventListener("click",async()=>{
@@ -681,9 +760,9 @@ async function renderManager(manager,child,row){
     if(!confirm(message))return;
     try{
       const result=await api("/delete-account",{target_user_id:child.user_id});
-      manager.remove();
-      rowSuccess(row,"✓ "+(result.message||"帳號刪除成功"));
-      await loadContext(false);
+      currentChildren=currentChildren.filter(x=>String(x.user_id)!==String(child.user_id));
+      notify("✓ "+(result.message||"帳號刪除成功"),"success");
+      renderChildren();
     }catch(e){localStatus(host,translateError(e.message))}
   });
 }
@@ -717,7 +796,9 @@ async function createAccount(){
   try{
     if(!name)throw new Error("請輸入名稱");validateAccountLike(account,"帳號");validateAccountLike(password,"密碼");if(!role)throw new Error("請選擇商業層級");if(!Number.isInteger(quota)||quota<0)throw new Error("初始額度必須是0以上整數");
     await api("/create-account",{parent_user_id:ctx.user_id,display_name:name,account,password,business_role:role,initial_quota:quota});
-    document.getElementById("createPanel").style.display="none";resetCreateForm();showPage(role==="member"?"✓ 會員帳號建立成功":role==="co_admin"?"✓ 共同管理員建立成功":`✓ 帳號建立成功${quota>0?`，已分配額度 ${quota}`:""}`);await loadContext(false);
+    resetCreateForm();
+    notify(role==="member"?"✓ 會員帳號建立成功":role==="co_admin"?"✓ 共同管理員建立成功":`✓ 帳號建立成功${quota>0?`，已分配額度 ${quota}`:""}`,"success");
+    await refreshChildrenDataOnly();
   }catch(e){setStatus(status,"建立失敗："+translateError(e.message),"error",true)}
 }
 
@@ -749,6 +830,7 @@ async function claimPassword(){
 
 const AUDIT_LABELS={
   ACCOUNT_CREATE:"建立帳號",
+  ACCOUNT_DELETE:"刪除帳號",
   DISPLAY_NAME_UPDATE:"修改名稱",
   SELF_PASSWORD_UPDATE:"修改自己的密碼",
   PASSWORD_RESET:"重設密碼",
@@ -788,7 +870,8 @@ function auditSummary(item){
     case "USAGE_TIME_UPDATE":
       return `時間限制：${n.is_enabled?"啟用":"關閉"}`;
     case "TAKEOVER_AND_DELETE_ACCOUNT":
-      return `接手直屬：${n.transferred_direct_children||0} 個`;
+    case "ACCOUNT_DELETE":
+      return `刪除帳號${Number(n.transferred_direct_children||0)>0?`｜接手直屬：${n.transferred_direct_children} 個`:""}`;
     default:
       return item.reason||"";
   }
@@ -827,8 +910,12 @@ function openSelfName(){
   panel.querySelector(".self-cancel").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
   panel.querySelector(".self-save").addEventListener("click",async()=>{
     const value=panel.querySelector(".self-name").value.trim();if(!value){localStatus(panel,"名稱不能空白");return}
-    try{await api("/update-display-name",{target_user_id:currentUser.id,display_name:value});currentSelf.display_name=value;document.getElementById("currentName").textContent=value;panel.style.display="none";panel.innerHTML="";showPage("✓ 名稱修改成功")}
-    catch(e){localStatus(panel,"修改失敗："+translateError(e.message))}
+    try{
+      await api("/update-display-name",{target_user_id:currentUser.id,display_name:value});
+      currentSelf.display_name=value;
+      document.getElementById("currentName").textContent=value;
+      notify("✓ 名稱修改成功","success");
+    }catch(e){localStatus(panel,"修改失敗："+translateError(e.message))}
   });
 }
 function openSelfPassword(){
@@ -841,8 +928,13 @@ function openSelfPassword(){
   panel.querySelector(".self-cancel").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
   panel.querySelector(".self-save").addEventListener("click",async()=>{
     const p1=panel.querySelector(".sp1").value,p2=panel.querySelector(".sp2").value;
-    try{validateAccountLike(p1,"密碼");if(p1!==p2)throw new Error("兩次輸入的密碼不一致");await api("/reset-password",{target_user_id:currentUser.id,new_password:p1});panel.style.display="none";panel.innerHTML="";showPage("✓ 密碼修改成功，請重新登入");setTimeout(async()=>{await supabaseClient.auth.signOut();showOnly("login")},1200)}
-    catch(e){localStatus(panel,"修改失敗："+translateError(e.message))}
+    try{
+      validateAccountLike(p1,"密碼");
+      if(p1!==p2)throw new Error("兩次輸入的密碼不一致");
+      await api("/reset-password",{target_user_id:currentUser.id,new_password:p1});
+      notify("✓ 密碼修改成功，3 秒後請重新登入","success");
+      setTimeout(async()=>{await supabaseClient.auth.signOut();showOnly("login")},3000);
+    }catch(e){localStatus(panel,"修改失敗："+translateError(e.message))}
   });
 }
 
