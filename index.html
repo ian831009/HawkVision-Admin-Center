@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.2.9</div>
+  <div class="version">Admin Center v2.3.0</div>
 </header>
 
 <main>
@@ -693,17 +693,55 @@ function validateAccountLike(v,label){if(!ACCOUNT_PASSWORD_RE.test(String(v||"")
 function translateError(message){
   const raw=String(message||"").trim();
   const m=raw.toLowerCase();
+
   if(!raw)return "操作失敗，請稍後再試";
-  if(m.includes("foreign key constraint")||m.includes("violates foreign key"))return "帳號仍有歷史資料關聯，系統尚未完成刪除處理，請重新整理後再試";
+
+  // 帳號重複
+  if(
+    m.includes("user already registered")||
+    m.includes("already been registered")||
+    m.includes("already registered")||
+    m.includes("user already exists")||
+    m.includes("email_exists")||
+    m.includes("email address has already")||
+    m.includes("duplicate key")||
+    m.includes("duplicate")||
+    m.includes("unique constraint")
+  ) return "帳號重複，請更換其他帳號";
+
+  // 額度不足
+  if(
+    m.includes("insufficient quota")||
+    m.includes("quota insufficient")||
+    m.includes("not enough quota")||
+    (m.includes("quota")&&m.includes("remaining"))||
+    (m.includes("quota")&&m.includes("exceed"))||
+    m.includes("額度不足")||
+    m.includes("剩餘額度不足")||
+    m.includes("最多只能收回")
+  ){
+    if(raw.includes("額度"))return raw;
+    return "額度不足，目前可使用額度不足以完成這次操作";
+  }
+
+  if(m.includes("foreign key constraint")||m.includes("violates foreign key"))
+    return "帳號仍有歷史資料關聯，系統尚未完成刪除處理，請重新整理後再試";
   if(m.includes("invalid login credentials"))return "帳號或密碼錯誤";
-  if(m.includes("user already registered")||m.includes("already been registered")||m.includes("duplicate key"))return "此帳號已經存在，請更換其他帳號";
   if(m.includes("email rate limit"))return "操作過於頻繁，請稍後再試";
-  if(m.includes("failed to fetch")||m.includes("network")||m.includes("fetch failed"))return "目前無法連接伺服器，請稍後再試";
-  if(m.includes("jwt")||m.includes("token")||m.includes("session"))return "登入狀態已失效，請重新登入";
-  if(m.includes("permission")||m.includes("not authorized")||m.includes("row-level security"))return "你沒有執行此操作的權限";
-  if(m.includes("timeout")||m.includes("statement timeout"))return "系統處理逾時，請稍後再試";
-  if(/^[\x00-\x7F\s\W]+$/.test(raw))return "系統發生錯誤，請稍後再試";
-  return raw;
+  if(m.includes("failed to fetch")||m.includes("network")||m.includes("fetch failed"))
+    return "目前無法連接伺服器，請稍後再試";
+  if(m.includes("jwt")||m.includes("token")||m.includes("session"))
+    return "登入狀態已失效，請重新登入";
+  if(m.includes("permission")||m.includes("not authorized")||m.includes("row-level security"))
+    return "你沒有執行此操作的權限";
+  if(m.includes("timeout")||m.includes("statement timeout"))
+    return "系統處理逾時，請稍後再試";
+
+  // 已經是中文就原樣顯示。
+  if(/[一-鿿]/.test(raw))return raw;
+
+  // 最後才使用通用訊息，避免可辨識錯誤被吞掉。
+  return "系統發生錯誤，請稍後再試";
 }
 function setStatus(el,msg,type="success",auto=true){
   if(!el)return;
