@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.2.7</div>
+  <div class="version">Admin Center v2.2.9</div>
 </header>
 
 <main>
@@ -821,17 +821,97 @@ async function rootContext(){
   if(error)throw new Error(translateError(error.message));
   return data;
 }
+function localAllowedRolesForContext(ctx){
+  if(!ctx)return [];
+  if(ctx.is_platform_owner===true){
+    return ["co_admin","shareholder","master_agent","agent","sub_agent","member"];
+  }
+  switch(ctx.business_role){
+    case "shareholder":
+      return ["master_agent","agent","sub_agent","member"];
+    case "master_agent":
+      return ["agent","sub_agent","member"];
+    case "agent":
+      return ["sub_agent","member"];
+    case "sub_agent":
+      return ["member"];
+    default:
+      return [];
+  }
+}
+
+function isOwnContext(ctx){
+  return Boolean(
+    ctx &&
+    currentUser?.id &&
+    String(ctx.user_id||ctx.id||"")===String(currentUser.id)
+  );
+}
+
 async function allowedRolesFor(parentId){
+  const ctx=contextStack.at(-1);
+
+  // 自己登入自己的層級時，直接依正式角色矩陣顯示，
+  // 不再讓新增按鈕因 RPC / schema cache 暫時失敗而消失。
+  if(isOwnContext(ctx)){
+    return localAllowedRolesForContext(ctx);
+  }
+
+  // 最高管理員自己的根層也固定完整顯示。
+  if(currentSelf?.is_platform_owner===true &&
+     String(parentId)===String(currentUser.id)){
+    return ["co_admin","shareholder","master_agent","agent","sub_agent","member"];
+  }
+
+  // 跨層代建才依後端權限判定。
   const roles=[];
   for(const role of ROLE_ORDER){
-    const {data,error}=await supabaseClient.rpc("hv_can_create_role_for_parent_v3",{p_actor_user_id:currentUser.id,p_parent_user_id:parentId,p_target_role:role});
-    if(!error&&data===true)roles.push(role);
+    let r=await supabaseClient.rpc("hv_can_create_role_for_parent_v3",{
+      p_actor_user_id:currentUser.id,
+      p_parent_user_id:parentId,
+      p_target_role:role
+    });
+
+    if(r.error && /function|schema cache|could not find/i.test(String(r.error.message||""))){
+      r=await supabaseClient.rpc("hv_can_create_role_for_parent_v2",{
+        p_actor_user_id:currentUser.id,
+        p_parent_user_id:parentId,
+        p_target_role:role
+      });
+    }
+
+    if(!r.error&&r.data===true)roles.push(role);
   }
   return roles;
 }
+
 async function canActAsParent(parentId){
-  const {data,error}=await supabaseClient.rpc("hv_can_act_as_parent_v3",{p_actor_user_id:currentUser.id,p_parent_user_id:parentId});
-  return !error&&data===true;
+  const ctx=contextStack.at(-1);
+
+  // 股東 / 總代 / 代理 / 子代理登入自己的管理頁，
+  // 一律依本身層級擁有新增功能。
+  if(isOwnContext(ctx)){
+    return localAllowedRolesForContext(ctx).length>0;
+  }
+
+  if(currentSelf?.is_platform_owner===true &&
+     String(parentId)===String(currentUser.id)){
+    return true;
+  }
+
+  let r=await supabaseClient.rpc("hv_can_act_as_parent_v3",{
+    p_actor_user_id:currentUser.id,
+    p_parent_user_id:parentId
+  });
+
+  if(r.error && /function|schema cache|could not find/i.test(String(r.error.message||""))){
+    r=await supabaseClient.rpc("hv_can_act_as_parent_v2",{
+      p_actor_user_id:currentUser.id,
+      p_parent_user_id:parentId
+    });
+  }
+
+  return !r.error&&r.data===true;
 }
 
 function renderBreadcrumb(){
@@ -1409,9 +1489,35 @@ async function loadContext(closePanels=true){
     document.getElementById("childList").innerHTML=`<div class="empty">載入失敗：${escapeHtml(translateError(error.message))}</div>`;return
   }
   currentChildren=Array.isArray(data)?data:[];
-  createAllowedRoles=await allowedRolesFor(ctx.user_id);
-  const canCreate=await canActAsParent(ctx.user_id);
-  document.getElementById("openCreateBtn").style.display=canCreate&&createAllowedRoles.length?"inline-block":"none";
+  const createBtn=document.getElementById("openCreateBtn");
+  try{
+    createAllowedRoles=await allowedRolesFor(ctx.user_id);
+    const canCreate=await canActAsParent(ctx.user_id);
+
+    if(canCreate&&createAllowedRoles.length){
+      createBtn.style.display="inline-block";
+      createBtn.disabled=false;
+      createBtn.title="";
+    }else{
+      createBtn.style.display="none";
+      createBtn.disabled=false;
+      createBtn.title="";
+    }
+  }catch(e){
+    // 自己的層級即使後端查詢暫時失敗，也用固定角色矩陣保留新增功能。
+    if(isOwnContext(ctx)){
+      createAllowedRoles=localAllowedRolesForContext(ctx);
+      createBtn.style.display=createAllowedRoles.length?"inline-block":"none";
+      createBtn.disabled=false;
+      createBtn.title="";
+    }else{
+      createAllowedRoles=[];
+      createBtn.style.display="inline-block";
+      createBtn.disabled=true;
+      createBtn.title="建立權限讀取失敗，請重新整理後再試";
+    }
+  }
+
   populateRoleSelect();renderChildren();
 }
 function populateRoleSelect(){
