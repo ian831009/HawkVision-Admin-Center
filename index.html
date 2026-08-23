@@ -138,11 +138,28 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
 </style>
 
+
+<style>
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+*{box-sizing:border-box}
+main,.dashboard,.card,.account-row,.manager-box,.subpanel,.toolbar,.topbar,.panel,.child-list{min-width:0;max-width:100%}
+.top-actions,.toolbar-right,.row-actions,.manager-menu,.nav-actions{max-width:100%}
+input,select,button,a{max-width:100%}
+.audit-item,.audit-head,.audit-detail{min-width:0;max-width:100%;overflow-wrap:anywhere}
+@media(max-width:700px){
+  body{overflow-x:hidden}
+  .topbar,.toolbar,.manager-title,.audit-head{width:100%;max-width:100%}
+  .top-actions,.toolbar-right,.manager-menu,.nav-actions{width:100%;flex-wrap:wrap}
+  .manager-menu>button,.manager-menu>a{flex:0 1 auto}
+  .audit-head{align-items:flex-start}
+}
+</style>
+
 </head>
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.0.5</div>
+  <div class="version">Admin Center v2.0.6</div>
 </header>
 
 <main>
@@ -187,6 +204,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
       <span id="currentStatus" class="badge">啟用中</span>
     </div>
     <div class="top-actions">
+      <button id="myNameBtn" class="soft-cyan" type="button" style="display:none">修改我的名稱</button>
       <button id="myPasswordBtn" class="soft" type="button">修改我的密碼</button>
       <button id="auditLogBtn" class="soft-violet" type="button">異動日誌</button>
       <a id="hawkvisionHomeBtn" class="secondary hv-return-btn" href="https://hawkvisionai.com/">返回</a><button id="logoutBtn" class="secondary" type="button">登出</button>
@@ -568,7 +586,7 @@ async function renderManager(manager,child,row){
       ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
       ${showPermissionMenu?'<button class="soft-violet permission-menu" type="button">權限管理</button>':""}
       <button class="soft-amber time-menu" type="button">使用時間管理</button>
-      ${readonly?"":'${detail.can_rename?`<button class="soft-cyan name-menu" type="button">修改名稱</button>`:""}<button class="soft password-menu" type="button">修改密碼</button>'}
+      ${readonly?"":`${detail.can_rename?'<button class="soft-cyan name-menu" type="button">修改名稱</button>':""}<button class="soft password-menu" type="button">修改密碼</button>`}
     </div>
     <div class="subpanel-host"></div>
     ${readonly?"":`<div class="danger-zone"><div class="manager-menu">
@@ -647,7 +665,11 @@ async function renderManager(manager,child,row){
                 p_product_key:key,
                 p_enabled:enabled
               });
-              if(error)throw error;
+              if(error){
+                const {data:verifyRows}=await supabaseClient.rpc("hv_admin_product_access_v2",{p_target_user_id:detail.user_id});
+                const verified=(Array.isArray(verifyRows)?verifyRows:[]).find(x=>x.product_key===key);
+                if(!verified || Boolean(verified.is_enabled)!==enabled)throw error;
+              }
               original.is_enabled=enabled;
             }
           }
@@ -816,6 +838,7 @@ async function loadDashboard(){
   document.getElementById("currentName").textContent=currentSelf.display_name||currentSelf.account||"—";
   document.getElementById("currentRole").textContent="｜"+(currentSelf.role_name||ROLE_LABEL[currentSelf.business_role]||"");
   document.getElementById("currentStatus").textContent=currentSelf.is_enabled?"啟用中":"🚫 已停用";
+  document.getElementById("myNameBtn").style.display=currentSelf.is_platform_owner?"inline-flex":"none";
   const root=await rootContext();contextStack=[root];showOnly("dashboard");startSessionWatch();await loadContext();
 }
 async function login(){
@@ -917,14 +940,21 @@ async function openAuditLogs(){
     const {data,error}=await supabaseClient.rpc("hv_my_admin_audit_logs_v1",{p_limit:200,p_offset:0});
     if(error)throw error;
     const rows=Array.isArray(data)?data:[];
-    panel.innerHTML=`<div class="manager-title"><h3 style="margin:0">我的異動日誌</h3><button class="secondary audit-close" type="button">關閉</button></div>
+    panel.innerHTML=`<div class="manager-title"><h3 style="margin:0">我的異動日誌</h3><div class="nav-actions"><button class="soft audit-home" type="button">回到最上層</button><button class="secondary audit-close" type="button">關閉</button></div></div>
       <div class="hint" style="margin:8px 0 12px">只顯示你本人實際操作產生的異動。</div>
       <div class="audit-list">${rows.map(item=>`<div class="audit-item">
         <div class="audit-head"><div><div class="audit-type">${escapeHtml(AUDIT_LABELS[item.action_type]||item.action_type)}</div><div class="audit-target">${escapeHtml(item.target_display_name||item.target_account||"—")}</div></div><div class="audit-time">${escapeHtml(formatAuditTime(item.created_at))}</div></div>
-        ${auditSummary(item)?`<div class="audit-target">${escapeHtml(auditSummary(item))}</div>`:""}
         ${item.has_detail?`<button class="secondary audit-detail-btn" type="button" style="margin-top:8px">查看詳細</button><div class="audit-detail" style="display:none">${escapeHtml(auditDetailText(item))}</div>`:""}
       </div>`).join("")||'<div class="empty">目前沒有異動紀錄</div>'}</div>`;
     panel.querySelector(".audit-close").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
+    panel.querySelector(".audit-home").addEventListener("click",async()=>{
+      panel.style.display="none";
+      panel.innerHTML="";
+      clearAccountSearch();
+      closeAllPanels();
+      if(contextStack.length>1)contextStack=contextStack.slice(0,1);
+      await loadContext(false);
+    });
     panel.querySelectorAll(".audit-detail-btn").forEach(btn=>btn.addEventListener("click",()=>{
       const detail=btn.nextElementSibling;
       const open=detail.style.display!=="none";
@@ -936,7 +966,29 @@ async function openAuditLogs(){
   }
 }
 
-function openSelfName(){notify("名稱只能由建立你的上層管理者修改","error");}
+function openSelfName(){
+  if(!currentSelf?.is_platform_owner){
+    notify("只有最高管理員可以修改自己的名稱","error");
+    return;
+  }
+  closeAllPanels();
+  const panel=document.getElementById("selfPanel");
+  panel.style.display="block";
+  panel.innerHTML=`<h3>修改我的名稱</h3>
+    <div><label>新名稱</label><input class="self-name" maxlength="50" value="${escapeHtml(currentSelf.display_name||"")}"></div>
+    <div class="local-status status"></div>
+    <div class="panel-actions"><button class="primary save-self-name" type="button">儲存名稱</button></div>`;
+  panel.querySelector(".save-self-name").addEventListener("click",async()=>{
+    const value=panel.querySelector(".self-name").value.trim();
+    if(!value){localStatus(panel,"名稱不能空白");return}
+    try{
+      await api("/update-display-name",{target_user_id:currentUser.id,display_name:value});
+      currentSelf.display_name=value;
+      document.getElementById("currentName").textContent=value;
+      notify("✓ 名稱修改成功","success");
+    }catch(err){localStatus(panel,translateError(err.message))}
+  });
+}
 
 function openSelfPassword(){
   closeAllPanels();const panel=document.getElementById("selfPanel");panel.style.display="block";
@@ -970,6 +1022,7 @@ document.getElementById("logoutBtn").addEventListener("click",async()=>{
   window.location.replace("https://hawkvisionai.com/?logout=1");
 });
 
+document.getElementById("myNameBtn").addEventListener("click",openSelfName);
 document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
 document.getElementById("auditLogBtn").addEventListener("click",openAuditLogs);
 document.getElementById("openCreateBtn").addEventListener("click",()=>{clearAccountSearch();
