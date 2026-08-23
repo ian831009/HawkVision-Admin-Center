@@ -142,7 +142,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.0.3</div>
+  <div class="version">Admin Center v2.0.5</div>
 </header>
 
 <main>
@@ -187,7 +187,6 @@ button:disabled{opacity:.5;cursor:not-allowed}
       <span id="currentStatus" class="badge">啟用中</span>
     </div>
     <div class="top-actions">
-      <button id="myNameBtn" class="soft-cyan" type="button">修改我的名稱</button>
       <button id="myPasswordBtn" class="soft" type="button">修改我的密碼</button>
       <button id="auditLogBtn" class="soft-violet" type="button">異動日誌</button>
       <a id="hawkvisionHomeBtn" class="secondary hv-return-btn" href="https://hawkvisionai.com/">返回</a><button id="logoutBtn" class="secondary" type="button">登出</button>
@@ -445,7 +444,7 @@ function startSessionWatch(){
 }
 
 async function selfDetail(){
-  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:currentUser.id});
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:currentUser.id});
   if(error)throw new Error(translateError(error.message));
   return data;
 }
@@ -538,7 +537,7 @@ function updateRowSummary(row,child){
   if(account)account.textContent=`帳號：${child.account||"—"}`;
 }
 async function refreshChildDetailInPlace(manager,child,row){
-  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:child.user_id});
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:child.user_id});
   if(error)throw error;
   Object.assign(child,data||{});
   updateRowSummary(row,child);
@@ -553,20 +552,23 @@ async function refreshChildrenDataOnly(){
 }
 
 async function renderManager(manager,child,row){
-  const [{data,error},{data:takeoverPlan,error:takeoverError}]=await Promise.all([
-    supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:child.user_id}),
-    supabaseClient.rpc("hv_takeover_delete_plan_v4",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id})
+  const [{data,error},{data:takeoverPlan,error:takeoverError},{data:permissionPolicy,error:permissionPolicyError}]=await Promise.all([
+    supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_takeover_delete_plan_v4",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_admin_product_access_v2",{p_target_user_id:child.user_id})
   ]);
   if(error){manager.innerHTML=`<div class="status error" style="display:block;">${escapeHtml(translateError(error.message))}</div>`;return}
   const detail={...child,...data},readonly=!detail.can_full_manage,noQuota=["member","co_admin"].includes(detail.business_role);
   detail.takeover_delete_plan=takeoverError?null:takeoverPlan;
+  detail.permission_policy=permissionPolicyError?[]:(Array.isArray(permissionPolicy)?permissionPolicy:[]);
+  const showPermissionMenu=detail.permission_policy.length>0;
   manager.innerHTML=`<div class="manager-title"><strong>${escapeHtml(detail.display_name||"未命名")}｜${escapeHtml(detail.role_name||ROLE_LABEL[detail.business_role]||"")}</strong><button class="secondary close-manager" type="button">收起</button></div>
     ${readonly?'<div class="readonly-note">目前為跨層查看模式：額度、權限、使用時間只能查看。</div>':""}
     <div class="manager-menu">
       ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
-      <button class="soft-violet permission-menu" type="button">權限管理</button>
+      ${showPermissionMenu?'<button class="soft-violet permission-menu" type="button">權限管理</button>':""}
       <button class="soft-amber time-menu" type="button">使用時間管理</button>
-      ${readonly?"":'<button class="soft-cyan name-menu" type="button">修改名稱</button><button class="soft password-menu" type="button">修改密碼</button>'}
+      ${readonly?"":'${detail.can_rename?`<button class="soft-cyan name-menu" type="button">修改名稱</button>`:""}<button class="soft password-menu" type="button">修改密碼</button>'}
     </div>
     <div class="subpanel-host"></div>
     ${readonly?"":`<div class="danger-zone"><div class="manager-menu">
@@ -601,10 +603,10 @@ async function renderManager(manager,child,row){
     host.querySelector(".reclaim-btn").addEventListener("click",()=>doQuota("reclaim"));
   });
 
-  manager.querySelector(".permission-menu").addEventListener("click",async()=>{
+  manager.querySelector(".permission-menu")?.addEventListener("click",async()=>{
     host.innerHTML='<div class="subpanel"><h4>權限管理</h4><div class="empty">載入中…</div></div>';
     try{
-      const {data:products,error:productError}=await supabaseClient.rpc("hv_admin_product_access_v1",{p_target_user_id:detail.user_id});
+      const {data:products,error:productError}=await supabaseClient.rpc("hv_admin_product_access_v2",{p_target_user_id:detail.user_id});
       if(productError)throw productError;
       const rows=Array.isArray(products)?products:[];
       const canModify=rows.some(x=>x.can_modify===true);
@@ -616,10 +618,11 @@ async function renderManager(manager,child,row){
 
       host.innerHTML=`<div class="subpanel"><h4>權限管理${canModify?"":"（查看）"}</h4>
         ${extra}
+        <div class="hint">一般管理層只能把自己已被上層開放的權限再提供給直屬下層；記錄平台僅最高管理員與共同管理員可開放。會員僅能使用分析平台。</div>
         <div style="margin-top:8px">${rows.map(p=>`<div class="product-row">
           <div><strong>${escapeHtml(p.display_name||p.product_key)}</strong><div class="hint">${escapeHtml(p.product_key)}</div></div>
           <input class="product-switch" data-key="${escapeHtml(p.product_key)}" type="checkbox" ${p.is_enabled?"checked":""} ${p.can_modify?"":"disabled"}>
-        </div>`).join("")||'<div class="empty">沒有可用產品</div>'}</div>
+        </div>`).join("")||'<div class="empty">目前沒有可授予的產品權限</div>'}</div>
         <div class="local-status status"></div>
         ${(canModify || (detail.business_role==="co_admin"&&currentSelf.is_platform_owner))?'<div class="panel-actions"><button class="primary save-permission" type="button">儲存權限</button></div>':""}
       </div>`;
@@ -770,7 +773,7 @@ async function renderManager(manager,child,row){
 async function loadContext(closePanels=true){
   if(closePanels)closeAllPanels();
   let ctx=contextStack.at(-1);
-  const {data:detail,error:detailError}=await supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:ctx.user_id});
+  const {data:detail,error:detailError}=await supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:ctx.user_id});
   if(!detailError&&detail){ctx={...ctx,...detail};contextStack[contextStack.length-1]=ctx}
   renderContextHeader();
   document.getElementById("childList").innerHTML='<div class="empty">載入中…</div>';
@@ -856,24 +859,53 @@ function formatAuditTime(v){
   if(!v)return "";
   try{return new Date(v).toLocaleString("zh-TW",{hour12:false})}catch{return String(v)}
 }
+function productLabel(key){
+  const k=String(key||"");
+  if(/record/i.test(k))return "記錄平台";
+  if(/analysis/i.test(k))return "分析平台";
+  if(/admin/i.test(k))return "管理中心";
+  return k||"未指定";
+}
+function boolLabel(v){return v===true?"開啟":v===false?"關閉":"未設定"}
+function dateTimeRange(d={}){
+  const dates=(d.start_date||d.end_date)?`${d.start_date||"不限"} ～ ${d.end_date||"不限"}`:"不限日期";
+  const times=(d.daily_start||d.daily_end)?`${String(d.daily_start||"不限").slice(0,5)} ～ ${String(d.daily_end||"不限").slice(0,5)}`:"不限時段";
+  const days=Array.isArray(d.allowed_weekdays)?d.allowed_weekdays.map(x=>["","一","二","三","四","五","六","日"][Number(x)]||x).join("、"):"不限";
+  return `${dates}｜週${days}｜${times}`;
+}
 function auditSummary(item){
   const n=item.new_data||{},o=item.old_data||{};
   switch(item.action_type){
-    case "QUOTA_ALLOCATE":
-    case "QUOTA_RECLAIM":
-      return `數量：${fmt(n.amount||0)}｜${fmt(o.quota_before||0)} → ${fmt(n.quota_after||0)}`;
-    case "PRODUCT_ACCESS_ENABLE":
-    case "PRODUCT_ACCESS_DISABLE":
-      return `產品：${n.product_key||o.product_key||"—"}`;
-    case "DISPLAY_NAME_UPDATE":
-      return `${o.target_display_name||"—"} → ${n.target_display_name||"—"}`;
-    case "USAGE_TIME_UPDATE":
-      return `時間限制：${n.is_enabled?"啟用":"關閉"}`;
-    case "TAKEOVER_AND_DELETE_ACCOUNT":
+    case "QUOTA_ALLOCATE": return `新增額度 ${fmt(n.amount||0)}；${fmt(o.quota_before||0)} → ${fmt(n.quota_after||0)}`;
+    case "QUOTA_RECLAIM": return `收回額度 ${fmt(n.amount||0)}；${fmt(o.quota_before||0)} → ${fmt(n.quota_after||0)}`;
+    case "PRODUCT_ACCESS_ENABLE": return `新增「${productLabel(n.product_key||o.product_key)}」權限`;
+    case "PRODUCT_ACCESS_DISABLE": return `移除「${productLabel(n.product_key||o.product_key)}」權限`;
+    case "DISPLAY_NAME_UPDATE": return `名稱：${o.target_display_name||"—"} → ${n.target_display_name||"—"}`;
+    case "USAGE_TIME_UPDATE": return "使用時間設定已變更";
+    case "COADMIN_PLATFORM_QUOTA_PERMISSION": return `共同管理員平台額度權限：${boolLabel(n.can_use_platform_quota)}`;
+    case "ACCOUNT_CREATE": return `建立帳號：${n.target_display_name||n.target_account||"—"}`;
     case "ACCOUNT_DELETE":
-      return `刪除帳號${Number(n.transferred_direct_children||0)>0?`｜接手直屬：${n.transferred_direct_children} 個`:""}`;
-    default:
-      return item.reason||"";
+    case "TAKEOVER_AND_DELETE_ACCOUNT": return `刪除帳號${Number(n.transferred_direct_children||0)>0?`；接手直屬 ${n.transferred_direct_children} 個`:""}`;
+    case "ENABLE_DIRECT_ACCOUNT": case "ENABLE_DIRECT_BRANCH": case "ACCOUNT_ENABLE": return "啟用帳號";
+    case "DISABLE_DIRECT_ACCOUNT": case "DISABLE_DIRECT_BRANCH": case "ACCOUNT_DISABLE": return "停用帳號";
+    case "PASSWORD_RESET": return "重設下屬密碼";
+    case "SELF_PASSWORD_UPDATE": case "PASSWORD_CLAIM": return "修改登入密碼";
+    default:return item.reason||"";
+  }
+}
+function auditDetailText(item){
+  const n=item.new_data||{},o=item.old_data||{};
+  switch(item.action_type){
+    case "PRODUCT_ACCESS_ENABLE": return `新增權限：${productLabel(n.product_key||o.product_key)}`;
+    case "PRODUCT_ACCESS_DISABLE": return `移除權限：${productLabel(n.product_key||o.product_key)}`;
+    case "USAGE_TIME_UPDATE": return `修改前：${dateTimeRange(o)}\n修改後：${dateTimeRange(n)}`;
+    case "QUOTA_ALLOCATE": return `異動：新增 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}`;
+    case "QUOTA_RECLAIM": return `異動：收回 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}`;
+    case "DISPLAY_NAME_UPDATE": return `原本名稱：${o.target_display_name||"—"}\n修改後名稱：${n.target_display_name||"—"}`;
+    case "COADMIN_PLATFORM_QUOTA_PERMISSION": return `平台額度權限：${boolLabel(n.can_use_platform_quota)}`;
+    case "ACCOUNT_CREATE": return `建立帳號：${n.target_display_name||n.target_account||"—"}\n角色：${n.business_role||"—"}${n.initial_quota!=null?`\n初始額度：${fmt(n.initial_quota)}`:""}`;
+    case "ACCOUNT_DELETE": case "TAKEOVER_AND_DELETE_ACCOUNT": return `刪除帳號：${o.target_display_name||o.target_account||"—"}${Number(n.transferred_direct_children||0)>0?`\n接手直屬下屬：${n.transferred_direct_children} 個`:""}`;
+    default:return auditSummary(item)||"此異動沒有其他詳細內容";
   }
 }
 async function openAuditLogs(){
@@ -890,7 +922,7 @@ async function openAuditLogs(){
       <div class="audit-list">${rows.map(item=>`<div class="audit-item">
         <div class="audit-head"><div><div class="audit-type">${escapeHtml(AUDIT_LABELS[item.action_type]||item.action_type)}</div><div class="audit-target">${escapeHtml(item.target_display_name||item.target_account||"—")}</div></div><div class="audit-time">${escapeHtml(formatAuditTime(item.created_at))}</div></div>
         ${auditSummary(item)?`<div class="audit-target">${escapeHtml(auditSummary(item))}</div>`:""}
-        ${item.has_detail?`<button class="secondary audit-detail-btn" type="button" style="margin-top:8px">查看詳細</button><div class="audit-detail" style="display:none">${escapeHtml(JSON.stringify({old:item.old_data,new:item.new_data,reason:item.reason},null,2))}</div>`:""}
+        ${item.has_detail?`<button class="secondary audit-detail-btn" type="button" style="margin-top:8px">查看詳細</button><div class="audit-detail" style="display:none">${escapeHtml(auditDetailText(item))}</div>`:""}
       </div>`).join("")||'<div class="empty">目前沒有異動紀錄</div>'}</div>`;
     panel.querySelector(".audit-close").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
     panel.querySelectorAll(".audit-detail-btn").forEach(btn=>btn.addEventListener("click",()=>{
@@ -904,20 +936,8 @@ async function openAuditLogs(){
   }
 }
 
-function openSelfName(){
-  closeAllPanels();const panel=document.getElementById("selfPanel");panel.style.display="block";
-  panel.innerHTML=`<h3>修改我的名稱</h3><label>新名稱</label><input class="self-name" type="text" value="${escapeHtml(currentSelf.display_name||"")}"><div class="local-status status"></div><div class="panel-actions"><button class="secondary self-cancel" type="button">取消</button><button class="primary self-save" type="button">確認修改</button></div>`;
-  panel.querySelector(".self-cancel").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
-  panel.querySelector(".self-save").addEventListener("click",async()=>{
-    const value=panel.querySelector(".self-name").value.trim();if(!value){localStatus(panel,"名稱不能空白");return}
-    try{
-      await api("/update-display-name",{target_user_id:currentUser.id,display_name:value});
-      currentSelf.display_name=value;
-      document.getElementById("currentName").textContent=value;
-      notify("✓ 名稱修改成功","success");
-    }catch(e){localStatus(panel,"修改失敗："+translateError(e.message))}
-  });
-}
+function openSelfName(){notify("名稱只能由建立你的上層管理者修改","error");}
+
 function openSelfPassword(){
   closeAllPanels();const panel=document.getElementById("selfPanel");panel.style.display="block";
   panel.innerHTML=`<h3>修改我的密碼</h3><div class="hint">6–11字元，小寫英文＋至少五個數字</div><div class="grid">
@@ -949,7 +969,7 @@ document.getElementById("logoutBtn").addEventListener("click",async()=>{
   currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];
   window.location.replace("https://hawkvisionai.com/?logout=1");
 });
-document.getElementById("myNameBtn").addEventListener("click",openSelfName);
+
 document.getElementById("myPasswordBtn").addEventListener("click",openSelfPassword);
 document.getElementById("auditLogBtn").addEventListener("click",openAuditLogs);
 document.getElementById("openCreateBtn").addEventListener("click",()=>{clearAccountSearch();
