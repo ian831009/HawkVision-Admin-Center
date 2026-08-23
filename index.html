@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.2.4</div>
+  <div class="version">Admin Center v2.2.5</div>
 </header>
 
 <main>
@@ -940,7 +940,7 @@ async function refreshChildrenDataOnly(){
 async function renderManager(manager,child,row){
   const [{data,error},{data:takeoverPlan,error:takeoverError},{data:permissionPolicy,error:permissionPolicyError},{data:effectiveAccess,error:effectiveError}]=await Promise.all([
     supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:child.user_id}),
-    supabaseClient.rpc("hv_takeover_delete_plan_v5",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_takeover_delete_plan_v6",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id}),
     supabaseClient.rpc("hv_admin_product_access_v3",{p_target_user_id:child.user_id}),
     supabaseClient.rpc("hv_account_effective_status_v1",{p_user_id:child.user_id})
   ]);
