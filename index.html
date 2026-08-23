@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.1.4</div>
+  <div class="version">Admin Center v2.2.0</div>
 </header>
 
 <main>
@@ -589,14 +589,12 @@ body{
           <div id="createPermissionOptions" class="create-permission-list"><div class="hint">請先選擇商業層級</div></div>
         </div>
 
-        <div class="create-option-block">
-          <div class="create-option-title">建立時設定使用時間（選填）</div>
-          <div class="hint">四個欄位都留空＝不限制使用時間；只要設定時間範圍就會自動啟用，不分星期。</div>
+        <div id="createScheduleBlock" class="create-option-block">
+          <div class="create-option-title">建立時設定合約時間（選填）</div>
+          <div class="hint">管理層可設定合約開始與結束時間；全部留空＝不限合約時間。</div>
           <div class="grid create-time-grid">
-            <div><label for="createStartDate">開始日期</label><input id="createStartDate" type="date"></div>
-            <div><label for="createEndDate">到期日期</label><input id="createEndDate" type="date"></div>
-            <div><label for="createStartTime">每日開始時間</label><input id="createStartTime" type="time"></div>
-            <div><label for="createEndTime">每日結束時間</label><input id="createEndTime" type="time"></div>
+            <div><label for="createContractStart">合約開始時間</label><input id="createContractStart" type="datetime-local"></div>
+            <div><label for="createContractEnd">合約結束時間</label><input id="createContractEnd" type="datetime-local"></div>
           </div>
         </div>
       </div>
@@ -782,7 +780,7 @@ function resetCreateForm(){
   document.getElementById("initialQuotaWrap").style.display="block";
   document.getElementById("createAdvancedOptions").style.display="none";
   document.getElementById("createPermissionOptions").innerHTML='<div class="hint">請先選擇商業層級</div>';
-  ["createStartDate","createEndDate","createStartTime","createEndTime"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""});
+  ["createContractStart","createContractEnd"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""});
   document.getElementById("createStatus").style.display="none";
 }
 function closeAllPanels(){
@@ -804,8 +802,12 @@ function startSessionWatch(){
   if(sessionWatch)clearInterval(sessionWatch);
   sessionWatch=setInterval(async()=>{
     if(!currentUser)return;
-    const {data,error}=await supabaseClient.rpc("hv_my_enabled_status");
-    if(!error&&data&&data.is_enabled===false)await handleDisabled();
+    const {data,error}=await supabaseClient.rpc("hv_my_effective_access_v1");
+    if(!error&&data&&data.allowed===false){
+      await supabaseClient.auth.signOut().catch(()=>{});
+      currentUser=null;currentSelf=null;showOnly("login");
+      setStatus(document.getElementById("loginStatus"),data.reason==="CONTRACT"?"合約已到期或尚未開始，請聯絡上層管理者":"此帳號目前已停用，無法使用管理中心","error",true);
+    }
   },5000);
 }
 
@@ -933,7 +935,7 @@ async function renderManager(manager,child,row){
     <div class="manager-menu">
       ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
       ${showPermissionMenu?'<button class="soft-violet permission-menu" type="button">權限管理</button>':""}
-      <button class="soft-amber time-menu" type="button">使用時間管理</button>
+      ${detail.business_role==="member"?'<button class="soft-amber hours-menu" type="button">時數管理</button>':'<button class="soft-amber contract-menu" type="button">合約時間</button>'}
       ${detail.can_rename?'<button class="soft-cyan name-menu" type="button">修改名稱</button>':""}
       ${detail.can_reset_password?'<button class="soft password-menu" type="button">修改密碼</button>':""}
     </div>
@@ -1013,7 +1015,7 @@ async function renderManager(manager,child,row){
   });
 
   manager.querySelector(".permission-menu")?.addEventListener("click",async()=>{
-    host.innerHTML='<div class="subpanel"><h4>權限管理</h4><div class="empty">載入中…</div></div>';
+    host.innerHTML='<div class="subpanel"><div class="empty">載入中…</div></div>';
     try{
       const {data:products,error:productError}=await supabaseClient.rpc("hv_admin_product_access_v3",{p_target_user_id:detail.user_id});
       if(productError)throw productError;
@@ -1025,9 +1027,8 @@ async function renderManager(manager,child,row){
         extra=`<div class="switch-line"><div><strong>使用平台額度</strong><div class="hint">允許此共同管理員代理最高管理員使用平台額度。</div></div><input class="platform-quota-switch" type="checkbox" ${detail.can_use_platform_quota?"checked":""}></div>`;
       }
 
-      host.innerHTML=`<div class="subpanel"><h4>權限管理${canModify?"":"（查看）"}</h4>
+      host.innerHTML=`<div class="subpanel">
         ${extra}
-        <div class="hint">一般管理層只能把自己已被上層開放的權限再提供給直屬下層；記錄平台僅最高管理員與共同管理員可開放。會員僅能使用分析平台。</div>
         <div style="margin-top:8px">${rows.map(p=>`<div class="product-row">
           <div><strong>${escapeHtml(p.display_name||p.product_key)}</strong><div class="hint">${escapeHtml(p.product_key)}</div></div>
           <input class="product-switch" data-key="${escapeHtml(p.product_key)}" type="checkbox" ${p.is_enabled?"checked":""} ${p.can_modify?"":"disabled"}>
@@ -1102,56 +1103,98 @@ async function renderManager(manager,child,row){
       });
 
     }catch(e){
-      host.innerHTML=`<div class="subpanel"><h4>權限管理</h4><div class="status error" style="display:block">${escapeHtml(translateError(e.message))}</div></div>`;
+      host.innerHTML=`<div class="subpanel"><div class="status error" style="display:block">${escapeHtml(translateError(e.message))}</div></div>`;
     }
   });
 
-  manager.querySelector(".time-menu").addEventListener("click",async()=>{
+  manager.querySelector(".contract-menu")?.addEventListener("click",async()=>{
     host.innerHTML='<div class="subpanel"><div class="empty">載入中…</div></div>';
     try{
-      const {data:rule,error}=await supabaseClient.rpc("hv_admin_usage_rule_v2",{p_target_user_id:detail.user_id});
+      const {data:rule,error}=await supabaseClient.rpc("hv_admin_contract_v1",{p_target_user_id:detail.user_id});
       if(error)throw error;
       const canModify=rule?.can_modify===true;
-
+      const localValue=v=>v?String(v).slice(0,16):"";
       host.innerHTML=`<div class="subpanel">
         <div class="grid">
-          <div><label>開始日期</label><input class="usage-start-date" type="date" value="${escapeHtml(rule?.start_date||"")}" ${canModify?"":"disabled"}></div>
-          <div><label>到期日期</label><input class="usage-end-date" type="date" value="${escapeHtml(rule?.end_date||"")}" ${canModify?"":"disabled"}></div>
-          <div><label>每日開始時間</label><input class="usage-start-time" type="time" value="${escapeHtml((rule?.daily_start||"").slice(0,5))}" ${canModify?"":"disabled"}></div>
-          <div><label>每日結束時間</label><input class="usage-end-time" type="time" value="${escapeHtml((rule?.daily_end||"").slice(0,5))}" ${canModify?"":"disabled"}></div>
+          <div><label>合約開始時間</label><input class="contract-start" type="datetime-local" value="${escapeHtml(localValue(rule?.contract_starts_at))}" ${canModify?"":"disabled"}></div>
+          <div><label>合約結束時間</label><input class="contract-end" type="datetime-local" value="${escapeHtml(localValue(rule?.contract_ends_at))}" ${canModify?"":"disabled"}></div>
         </div>
-        <div class="hint">四個欄位都留空＝不限制使用時間；設定完整時間範圍即自動啟用。時區固定 Asia/Taipei，每日時間可跨午夜，例如 22:00～06:00。</div>
+        <div class="hint">兩個欄位都留空＝不限合約時間。合約尚未開始或到期時，此帳號與其所有下屬暫時不能使用；資料、權限、額度與會員時數包都會保留，續約後自動恢復。</div>
         <div class="local-status status"></div>
-        ${canModify?'<div class="panel-actions"><button class="primary save-usage" type="button">儲存時間設定</button></div>':""}
+        ${canModify?'<div class="panel-actions"><button class="primary save-contract" type="button">儲存合約時間</button></div>':""}
       </div>`;
-
-      host.querySelector(".save-usage")?.addEventListener("click",async()=>{
-        const startDate=host.querySelector(".usage-start-date").value||null;
-        const endDate=host.querySelector(".usage-end-date").value||null;
-        const startTime=host.querySelector(".usage-start-time").value||null;
-        const endTime=host.querySelector(".usage-end-time").value||null;
-        const values=[startDate,endDate,startTime,endTime];
-        const any=values.some(Boolean),all=values.every(Boolean);
-        if(any&&!all){localStatus(host,"如要設定使用時間，開始日期、到期日期、每日開始時間、每日結束時間都必須填寫");return}
+      host.querySelector(".save-contract")?.addEventListener("click",async()=>{
+        const s=host.querySelector(".contract-start").value||null;
+        const e=host.querySelector(".contract-end").value||null;
+        if(Boolean(s)!==Boolean(e)){localStatus(host,"合約開始時間與結束時間必須一起設定");return}
+        if(s&&e&&new Date(e)<=new Date(s)){localStatus(host,"合約結束時間必須晚於開始時間");return}
         try{
-          const {error}=await supabaseClient.rpc("hv_set_usage_rule_v2",{
-            p_target_user_id:detail.user_id,
-            p_is_enabled:all,
-            p_start_date:startDate,
-            p_end_date:endDate,
-            p_allowed_weekdays:[1,2,3,4,5,6,7],
-            p_daily_start:startTime,
-            p_daily_end:endTime,
-            p_timezone:"Asia/Taipei"
-          });
+          const {error}=await supabaseClient.rpc("hv_set_contract_v1",{p_target_user_id:detail.user_id,p_starts_at:s,p_ends_at:e});
           if(error)throw error;
-          localStatus(host,all?"✓ 使用時間設定成功":"✓ 已清除使用時間限制","success");
+          localStatus(host,s?"✓ 合約時間設定成功":"✓ 已清除合約時間限制","success");
         }catch(e){localStatus(host,e.message||e,"error")}
       });
-    }catch(e){
-      host.innerHTML=`<div class="subpanel"><div class="local-status status"></div></div>`;
-      localStatus(host,e.message||e,"error");
-    }
+    }catch(e){host.innerHTML='<div class="subpanel"><div class="local-status status"></div></div>';localStatus(host,e.message||e,"error")}
+  });
+
+  manager.querySelector(".hours-menu")?.addEventListener("click",async()=>{
+    const renderHours=async()=>{
+      host.innerHTML='<div class="subpanel"><div class="empty">載入中…</div></div>';
+      try{
+        const {data,error}=await supabaseClient.rpc("hv_admin_member_hour_packages_v1",{p_target_user_id:detail.user_id});
+        if(error)throw error;
+        const d=data||{}, batches=Array.isArray(d.batches)?d.batches:[];
+        host.innerHTML=`<div class="subpanel">
+          <div class="quota-summary">
+            <div class="summary-box"><div class="small">未啟用時數包</div><div class="big">${fmt(d.available_packages||0)} 包</div></div>
+            <div class="summary-box"><div class="small">目前倒數剩餘</div><div class="big">${escapeHtml(d.active_remaining_text||"00:00:00")}</div></div>
+          </div>
+          ${d.can_grant?`<div class="grid">
+            <div><label>每包時數（小時）</label><input class="grant-hours" type="number" min="1" max="999" step="1"></div>
+            <div><label>時數包數量</label><input class="grant-count" type="number" min="1" max="999" step="1"></div>
+          </div><div class="panel-actions"><button class="primary grant-hours-btn" type="button">給予時數包</button></div>`:""}
+          <div class="local-status status"></div>
+          <div style="margin-top:14px">${batches.map(b=>`<div class="product-row">
+            <div><strong>${fmt(b.hours_per_package)} 小時 × ${fmt(b.original_count)} 包</strong>
+              <div class="hint">未啟用 ${fmt(b.available_count)}｜已啟用 ${fmt(b.activated_count)}｜已收回 ${fmt(b.reclaimed_count)}｜${escapeHtml(formatAuditTime(b.created_at))}</div>
+            </div>
+            ${b.can_reclaim&&Number(b.available_count)>0?`<button class="danger-soft reclaim-hours-btn" data-id="${escapeHtml(b.batch_id)}" data-max="${fmt(b.available_count)}" data-hours="${fmt(b.hours_per_package)}" type="button">收回</button>`:""}
+          </div>`).join("")||'<div class="empty">目前沒有時數包</div>'}</div>
+        </div>`;
+
+        host.querySelector(".grant-hours-btn")?.addEventListener("click",async()=>{
+          const h=Number(host.querySelector(".grant-hours").value),c=Number(host.querySelector(".grant-count").value);
+          if(!Number.isInteger(h)||h<1||h>999||!Number.isInteger(c)||c<1||c>999){localStatus(host,"每包時數與包數都必須是 1～999 的整數");return}
+          try{
+            const {error}=await supabaseClient.rpc("hv_grant_member_hour_packages_v1",{p_target_user_id:detail.user_id,p_hours_per_package:h,p_package_count:c});
+            if(error)throw error;
+            await renderHours(); localStatus(host,`✓ 已給予 ${h} 小時 × ${c} 包`,"success");
+          }catch(e){localStatus(host,e.message||e,"error")}
+        });
+
+        for(const btn of host.querySelectorAll(".reclaim-hours-btn")){
+          btn.addEventListener("click",()=>{
+            const max=Number(btn.dataset.max),hours=Number(btn.dataset.hours),batchId=btn.dataset.id;
+            const box=document.createElement("div");
+            box.className="subpanel";
+            box.innerHTML=`<strong>收回 ${hours} 小時時數包</strong><div class="grid" style="margin-top:10px"><div><label>收回數量（最多 ${max} 包）</label><input class="reclaim-count" type="number" min="1" max="${max}" step="1"></div></div><div class="local-status status"></div><div class="panel-actions"><button class="secondary cancel-reclaim" type="button">取消</button><button class="danger confirm-reclaim-step1" type="button">送出</button></div>`;
+            btn.closest(".product-row").after(box);
+            box.querySelector(".cancel-reclaim").onclick=()=>box.remove();
+            box.querySelector(".confirm-reclaim-step1").onclick=async()=>{
+              const c=Number(box.querySelector(".reclaim-count").value);
+              if(!Number.isInteger(c)||c<1||c>max){localStatus(box,`收回數量必須是 1～${max}`);return}
+              if(!confirm(`確定要收回「${hours} 小時時數包」共 ${c} 包嗎？\\n此操作完成後無法復原。`))return;
+              try{
+                const {error}=await supabaseClient.rpc("hv_reclaim_member_hour_packages_v1",{p_batch_id:batchId,p_package_count:c});
+                if(error)throw error;
+                await renderHours();localStatus(host,`✓ 已收回 ${hours} 小時 × ${c} 包`,"success");
+              }catch(e){localStatus(box,e.message||e,"error")}
+            };
+          });
+        }
+      }catch(e){host.innerHTML='<div class="subpanel"><div class="local-status status"></div></div>';localStatus(host,e.message||e,"error")}
+    };
+    await renderHours();
   });
 
 
@@ -1269,6 +1312,24 @@ async function loadCreateAdvancedOptions(role){
     return;
   }
   wrap.style.display="block";
+  const scheduleBlock=document.getElementById("createScheduleBlock");
+  if(scheduleBlock){
+    if(role==="member"){
+      scheduleBlock.innerHTML=`<div class="create-option-title">建立時給予時數包（選填）</div>
+        <div class="hint">每包小時數與包數皆為 1～999；留空或 0 表示建立後再給予。</div>
+        <div class="grid create-time-grid">
+          <div><label for="createPackageHours">每包時數（小時）</label><input id="createPackageHours" type="number" min="1" max="999" step="1"></div>
+          <div><label for="createPackageCount">時數包數量</label><input id="createPackageCount" type="number" min="1" max="999" step="1"></div>
+        </div>`;
+    }else{
+      scheduleBlock.innerHTML=`<div class="create-option-title">建立時設定合約時間（選填）</div>
+        <div class="hint">合約開始與結束時間都留空＝不限合約時間。</div>
+        <div class="grid create-time-grid">
+          <div><label for="createContractStart">合約開始時間</label><input id="createContractStart" type="datetime-local"></div>
+          <div><label for="createContractEnd">合約結束時間</label><input id="createContractEnd" type="datetime-local"></div>
+        </div>`;
+    }
+  }
   list.innerHTML='<div class="hint">載入可授予權限…</div>';
   try{
     const {data,error}=await supabaseClient.rpc("hv_grantable_products_for_new_account_v1",{
@@ -1285,15 +1346,20 @@ async function loadCreateAdvancedOptions(role){
     list.innerHTML=`<div class="hint" style="color:#991b1b">${escapeHtml(translateError(e.message))}</div>`;
   }
 }
-function collectCreateUsage(){
-  const start_date=document.getElementById("createStartDate").value||null;
-  const end_date=document.getElementById("createEndDate").value||null;
-  const daily_start=document.getElementById("createStartTime").value||null;
-  const daily_end=document.getElementById("createEndTime").value||null;
-  const vals=[start_date,end_date,daily_start,daily_end];
-  const any=vals.some(Boolean),all=vals.every(Boolean);
-  if(any&&!all)throw new Error("建立時如要設定使用時間，四個時間欄位都必須填寫");
-  return all?{start_date,end_date,daily_start,daily_end,timezone:"Asia/Taipei"}:null;
+function collectCreateSchedule(role){
+  if(role==="member"){
+    const h=Number(document.getElementById("createPackageHours")?.value||0);
+    const c=Number(document.getElementById("createPackageCount")?.value||0);
+    if(h===0&&c===0)return {contract:null,hour_package:null};
+    if(!Number.isInteger(h)||h<1||h>999||!Number.isInteger(c)||c<1||c>999)
+      throw new Error("會員時數包的每包時數與包數都必須是 1～999 的整數");
+    return {contract:null,hour_package:{hours:h,count:c}};
+  }
+  const start=document.getElementById("createContractStart")?.value||null;
+  const end=document.getElementById("createContractEnd")?.value||null;
+  if(Boolean(start)!==Boolean(end))throw new Error("合約開始時間與合約結束時間必須一起設定");
+  if(start&&end&&new Date(end)<=new Date(start))throw new Error("合約結束時間必須晚於開始時間");
+  return {contract:start?{starts_at:start,ends_at:end}:null,hour_package:null};
 }
 async function createAccount(){
   const ctx=contextStack.at(-1);
@@ -1312,7 +1378,7 @@ async function createAccount(){
     if(!Number.isInteger(quota)||quota<0)throw new Error("初始額度必須是0以上整數");
 
     const product_keys=[...document.querySelectorAll(".create-product-check:checked")].map(x=>x.value);
-    const usage_rule=collectCreateUsage();
+    const schedule=collectCreateSchedule(role);
 
     const result=await api("/create-account",{
       parent_user_id:ctx.user_id,
@@ -1322,7 +1388,8 @@ async function createAccount(){
       business_role:role,
       initial_quota:quota,
       product_keys,
-      usage_rule
+      contract:schedule.contract,
+      hour_package:schedule.hour_package
     });
 
     resetCreateForm();
@@ -1339,6 +1406,14 @@ async function loadDashboard(){
   if(hasAdminAccess!==true){await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});throw new Error("此帳號沒有管理中心使用權限");}
 
   currentSelf=await selfDetail();
+  const {data:effectiveAccess,error:effectiveError}=await supabaseClient.rpc("hv_my_effective_access_v1");
+  if(effectiveError)throw effectiveError;
+  if(effectiveAccess?.allowed===false){
+    await supabaseClient.auth.signOut().catch(()=>{});
+    showOnly("login");
+    setStatus(document.getElementById("loginStatus"),effectiveAccess.reason==="CONTRACT"?"合約已到期或尚未開始，請聯絡上層管理者":"此帳號目前已停用，無法使用管理中心","error",true);
+    return;
+  }
   if(currentSelf.business_role==="member"){await supabaseClient.auth.signOut();showOnly("login");setStatus(document.getElementById("loginStatus"),"會員不使用管理中心","error",true);return}
   if(currentSelf.must_change_password&&!currentSelf.is_platform_owner){showOnly("claim");return}
   document.getElementById("currentName").textContent=currentSelf.display_name||currentSelf.account||"—";
@@ -1376,6 +1451,10 @@ const AUDIT_LABELS={
   PRODUCT_ACCESS_ENABLE:"開啟產品權限",
   PRODUCT_ACCESS_DISABLE:"關閉產品權限",
   USAGE_TIME_UPDATE:"使用時間異動",
+  CONTRACT_TIME_UPDATE:"合約時間異動",
+  MEMBER_HOUR_PACKAGE_GRANT:"給予會員時數包",
+  MEMBER_HOUR_PACKAGE_RECLAIM:"收回會員時數包",
+  MEMBER_HOUR_PACKAGE_ACTIVATE:"啟用會員時數包",
   TAKEOVER_AND_DELETE_ACCOUNT:"刪除並接手下屬",
   TAKEOVER_DIRECT_CHILDREN_V2:"接手直屬下屬",
   ENABLE_DIRECT_ACCOUNT:"啟用帳號",
@@ -1410,6 +1489,10 @@ function auditSummary(item){
     case "PRODUCT_ACCESS_DISABLE": return `移除「${productLabel(n.product_key||o.product_key)}」權限`;
     case "DISPLAY_NAME_UPDATE": return `名稱：${o.target_display_name||"—"} → ${n.target_display_name||"—"}`;
     case "USAGE_TIME_UPDATE": return "使用時間設定已變更";
+    case "CONTRACT_TIME_UPDATE": return "合約時間設定已變更";
+    case "MEMBER_HOUR_PACKAGE_GRANT": return `給予 ${fmt(n.hours_per_package||0)} 小時 × ${fmt(n.package_count||0)} 包`;
+    case "MEMBER_HOUR_PACKAGE_RECLAIM": return `收回 ${fmt(n.hours_per_package||0)} 小時 × ${fmt(n.package_count||0)} 包`;
+    case "MEMBER_HOUR_PACKAGE_ACTIVATE": return `啟用 ${fmt(n.hours_per_package||0)} 小時時數包`;
     case "COADMIN_PLATFORM_QUOTA_PERMISSION": return `共同管理員平台額度權限：${boolLabel(n.can_use_platform_quota)}`;
     case "ACCOUNT_CREATE": return `建立帳號：${n.target_display_name||n.target_account||"—"}`;
     case "ACCOUNT_DELETE":
@@ -1427,6 +1510,10 @@ function auditDetailText(item){
     case "PRODUCT_ACCESS_ENABLE": return `新增權限：${productLabel(n.product_key||o.product_key)}`;
     case "PRODUCT_ACCESS_DISABLE": return `移除權限：${productLabel(n.product_key||o.product_key)}`;
     case "USAGE_TIME_UPDATE": return `修改前：${dateTimeRange(o)}\n修改後：${dateTimeRange(n)}`;
+    case "CONTRACT_TIME_UPDATE": return `修改前：${o.contract_starts_at||"不限"} ～ ${o.contract_ends_at||"不限"}\n修改後：${n.contract_starts_at||"不限"} ～ ${n.contract_ends_at||"不限"}`;
+    case "MEMBER_HOUR_PACKAGE_GRANT": return `給予：${fmt(n.hours_per_package||0)} 小時 × ${fmt(n.package_count||0)} 包`;
+    case "MEMBER_HOUR_PACKAGE_RECLAIM": return `收回：${fmt(n.hours_per_package||0)} 小時 × ${fmt(n.package_count||0)} 包`;
+    case "MEMBER_HOUR_PACKAGE_ACTIVATE": return `啟用：${fmt(n.hours_per_package||0)} 小時時數包`;
     case "QUOTA_ALLOCATE": return `異動：新增 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}`;
     case "QUOTA_RECLAIM": return `異動：收回 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}`;
     case "DISPLAY_NAME_UPDATE": return `原本名稱：${o.target_display_name||"—"}\n修改後名稱：${n.target_display_name||"—"}`;
