@@ -355,11 +355,44 @@ body{
 }
 </style>
 
+
+<style id="hv-audit-pagination-v210">
+.audit-pagination{
+  margin-top:16px;
+  padding-top:14px;
+  border-top:1px solid #e2e8f0;
+}
+.audit-page-info{
+  text-align:center;
+  color:#64748b;
+  font-size:12px;
+  margin-bottom:10px;
+}
+.audit-page-actions{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+}
+.audit-page-actions button{
+  min-width:0;
+  width:100%;
+}
+.audit-page-actions button:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+@media(max-width:700px){
+  .audit-page-actions{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+</style>
+
 </head>
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.0.9</div>
+  <div class="version">Admin Center v2.1.0</div>
 </header>
 
 <main>
@@ -552,8 +585,17 @@ function translateError(message){
   return raw;
 }
 function setStatus(el,msg,type="success",auto=true){
-  el.textContent=msg;el.className=`status ${type}`;el.style.display="block";
-  if(auto)setTimeout(()=>{el.style.display="none";el.textContent=""},3000);
+  if(!el)return;
+  clearTimeout(el._statusTimer);
+  el.textContent=type==="error"?translateError(msg):String(msg||"");
+  el.className=`status ${type}`;
+  el.style.display="block";
+  if(auto){
+    el._statusTimer=setTimeout(()=>{
+      el.style.display="none";
+      el.textContent="";
+    },3000);
+  }
 }
 function notify(msg,type="success"){
   let el=document.getElementById("hvToast");
@@ -589,27 +631,7 @@ function bindPasswordToggles(scope=document){
 }
 bindPasswordToggles();
 
-function installTransientMessageObserver(){
-  const arm=(el)=>{
-    if(!el || el.dataset.hvTransientArmed==="1")return;
-    if(!el.matches?.(".status.error,.status.success,.local-status"))return;
-    el.dataset.hvTransientArmed="1";
-    setTimeout(()=>{
-      el.style.display="none";
-      el.textContent="";
-      el.dataset.hvTransientArmed="0";
-    },3000);
-  };
-  document.querySelectorAll(".status.error,.status.success,.local-status").forEach(arm);
-  new MutationObserver(muts=>{
-    muts.forEach(m=>m.addedNodes.forEach(n=>{
-      if(n.nodeType!==1)return;
-      arm(n);
-      n.querySelectorAll?.(".status.error,.status.success,.local-status").forEach(arm);
-    }));
-  }).observe(document.body,{childList:true,subtree:true});
-}
-installTransientMessageObserver();
+/* v2.1.0：提示訊息只由 setStatus 自己控制完整 3 秒，不再使用全域 Observer。 */
 
 
 async function token(){
@@ -740,7 +762,7 @@ function renderChildren(){
     row.querySelector(".enter-btn")?.addEventListener("click",async()=>{clearAccountSearch();closeAllPanels();contextStack.push(child);await loadContext(false)});
   }
 }
-function localStatus(host,msg,type="error"){let el=host.querySelector(".local-status");if(!el){el=document.createElement("div");el.className="status local-status";host.appendChild(el)}setStatus(el,translateError(msg),type,true)}
+function localStatus(host,msg,type="error"){let el=host.querySelector(".local-status");if(!el){el=document.createElement("div");el.className="status local-status";host.appendChild(el)}setStatus(el,msg,type,true)}
 function rowSuccess(row,msg){notify(msg,"success")}
 
 
@@ -814,8 +836,18 @@ async function renderManager(manager,child,row){
       try{
         await api(action==="allocate"?"/allocate-quota":"/reclaim-quota",{owner_user_id:child.parent_id,target_user_id:child.user_id,amount,reason});
         localStatus(host,action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功","success");
-        await refreshChildDetailInPlace(manager,child,row);
-      }catch(e){localStatus(host,translateError(e.message))}
+        try{
+          const {data:fresh}=await supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:child.user_id});
+          if(fresh){
+            Object.assign(child,fresh);
+            updateRowSummary(row,child);
+            const total=host.querySelector(".quota-summary .summary-box:first-child .big");
+            const remaining=host.querySelector(".quota-summary .summary-box:last-child .big");
+            if(total)total.textContent=fmt(fresh.quota_total);
+            if(remaining)remaining.textContent=fmt(fresh.quota_remaining);
+          }
+        }catch{}
+      }catch(e){localStatus(host,e.message||e,"error")}
     };
     host.querySelector(".allocate-btn").addEventListener("click",()=>doQuota("allocate"));
     host.querySelector(".reclaim-btn").addEventListener("click",()=>doQuota("reclaim"));
@@ -862,37 +894,41 @@ async function renderManager(manager,child,row){
             const enabled=input.checked===true;
             if(!original || enabled===Boolean(original.is_enabled))continue;
 
-            const {error}=await supabaseClient.rpc("hv_set_user_product_access_v2",{
+            const {error:mutationError}=await supabaseClient.rpc("hv_set_user_product_access_v2",{
               p_target_user_id:detail.user_id,
               p_product_key:key,
               p_enabled:enabled
             });
 
-            // 無論 RPC 是否回報 error，都重新讀正式狀態。
-            const {data:verifyRows,error:verifyError}=await supabaseClient.rpc(
-              "hv_admin_product_access_v2",
-              {p_target_user_id:detail.user_id}
-            );
-            if(verifyError)throw verifyError;
-
-            const verified=(Array.isArray(verifyRows)?verifyRows:[]).find(x=>x.product_key===key);
-            if(!verified || Boolean(verified.is_enabled)!==enabled){
-              if(error)throw error;
-              throw new Error("權限狀態更新失敗，請重新整理後再試");
+            if(mutationError){
+              const {data:verifyRows,error:verifyError}=await supabaseClient.rpc(
+                "hv_admin_product_access_v2",
+                {p_target_user_id:detail.user_id}
+              );
+              if(verifyError)throw mutationError;
+              const verified=(Array.isArray(verifyRows)?verifyRows:[]).find(x=>x.product_key===key);
+              if(!verified || Boolean(verified.is_enabled)!==enabled)throw mutationError;
             }
 
             original.is_enabled=enabled;
             changed.push({key,enabled});
           }
 
-          if(changed.length===0){
-            localStatus(host,"目前權限沒有變更","success");
-          }else{
-            localStatus(host,"✓ 權限設定成功","success");
-          }
+          localStatus(host,changed.length?"✓ 權限設定成功":"目前權限沒有變更","success");
+
+          // 成功後只做非關鍵的背景同步；失敗不影響成功訊息。
+          try{
+            const {data:fresh}=await supabaseClient.rpc(
+              "hv_admin_product_access_v2",
+              {p_target_user_id:detail.user_id}
+            );
+            for(const input of host.querySelectorAll(".product-switch")){
+              const row=(Array.isArray(fresh)?fresh:[]).find(x=>x.product_key===input.dataset.key);
+              if(row)input.checked=Boolean(row.is_enabled);
+            }
+          }catch{}
         }catch(e){
-          localStatus(host,translateError(e.message));
-          // 出錯後同步畫面到資料庫正式狀態，避免 checkbox 顯示錯誤。
+          localStatus(host,e.message||e,"error");
           try{
             const {data:fresh}=await supabaseClient.rpc(
               "hv_admin_product_access_v2",
@@ -951,7 +987,7 @@ async function renderManager(manager,child,row){
           });
           if(error)throw error;
           localStatus(host,"✓ 使用時間設定成功","success");
-        }catch(e){localStatus(host,translateError(e.message))}
+        }catch(e){localStatus(host,e.message||e,"error")}
       });
     }catch(e){
       host.innerHTML=`<div class="subpanel"><h4>使用時間管理</h4><div class="status error" style="display:block">${escapeHtml(translateError(e.message))}</div></div>`;
@@ -967,24 +1003,26 @@ async function renderManager(manager,child,row){
       try{
         await api("/update-display-name",{target_user_id:child.user_id,display_name:value});
         child.display_name=value;
+        detail.display_name=value;
         updateRowSummary(row,child);
         localStatus(host,"✓ 名稱修改成功","success");
-        await refreshChildDetailInPlace(manager,child,row);
       }catch(e){
-        // 若 API 後段同步失敗，再讀一次正式 profile 狀態。
-        // 名稱已成功寫入時，不對使用者顯示失敗。
+        // API 若回報錯誤，才讀正式資料確認是否其實已成功。
         try{
-          const {data:verifyDetail}=await supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:child.user_id});
-          if(verifyDetail && String(verifyDetail.display_name||"").trim()===value){
+          const {data:verifyDetail,error:verifyError}=await supabaseClient.rpc(
+            "hv_admin_account_detail_v4",
+            {p_target_user_id:child.user_id}
+          );
+          if(!verifyError && verifyDetail && String(verifyDetail.display_name||"").trim()===value){
             child.display_name=value;
+            detail.display_name=value;
             updateRowSummary(row,child);
             localStatus(host,"✓ 名稱修改成功","success");
-            await refreshChildDetailInPlace(manager,child,row);
           }else{
-            localStatus(host,translateError(e.message));
+            localStatus(host,e.message||e,"error");
           }
         }catch{
-          localStatus(host,translateError(e.message));
+          localStatus(host,e.message||e,"error");
         }
       }
     });
@@ -1015,10 +1053,10 @@ async function renderManager(manager,child,row){
     try{
       await api("/set-account-enabled",{target_user_id:child.user_id,enabled:enabling});
       child.is_enabled=enabling;
+      detail.is_enabled=enabling;
       updateRowSummary(row,child);
       localStatus(host,enabling?"✓ 帳號及所有下屬已啟用":"✓ 帳號及所有下屬已停用","success");
-      await refreshChildDetailInPlace(manager,child,row);
-    }catch(e){localStatus(host,translateError(e.message))}
+    }catch(e){localStatus(host,e.message||e,"error")}
   });
 
   manager.querySelector(".delete-menu")?.addEventListener("click",async()=>{
@@ -1179,27 +1217,67 @@ function auditDetailText(item){
     default:return auditSummary(item)||"此異動沒有其他詳細內容";
   }
 }
-async function openAuditLogs(){
+let auditCurrentPage=1;
+const AUDIT_PAGE_SIZE=20;
+
+async function openAuditLogs(page=1){
   closeAllPanels();
   const panel=document.getElementById("selfPanel");
   panel.style.display="block";
   panel.innerHTML='<h3>我的異動日誌</h3><div class="empty">載入中…</div>';
+
   try{
-    const {data,error}=await supabaseClient.rpc("hv_my_admin_audit_logs_v1",{p_limit:200,p_offset:0});
+    const requestedPage=Math.max(1,Number(page)||1);
+    const offset=(requestedPage-1)*AUDIT_PAGE_SIZE;
+
+    const {data,error}=await supabaseClient.rpc(
+      "hv_my_admin_audit_logs_v2",
+      {p_limit:AUDIT_PAGE_SIZE,p_offset:offset}
+    );
     if(error)throw error;
-    const rows=Array.isArray(data)?data:[];
+
+    const rows=Array.isArray(data?.items)?data.items:[];
+    const total=Number(data?.total_count||0);
+    const lastPage=Math.max(1,Math.ceil(total/AUDIT_PAGE_SIZE));
+    auditCurrentPage=Math.min(requestedPage,lastPage);
+
+    // 若因刪除等原因頁數縮短，重新讀最後有效頁。
+    if(auditCurrentPage!==requestedPage){
+      return openAuditLogs(auditCurrentPage);
+    }
+
     panel.innerHTML=`<div class="manager-title"><h3 style="margin:0">我的異動日誌</h3><button class="secondary audit-close" type="button">關閉</button></div>
-      <div class="hint" style="margin:8px 0 12px">只顯示你本人實際操作產生的異動。</div>
+      <div class="hint" style="margin:8px 0 12px">只顯示你本人實際操作產生的異動。每頁最多 20 筆，異動紀錄永久保存。</div>
       <button class="audit-floating-home" type="button">回到最上方</button>
       <div class="audit-list">${rows.map(item=>`<div class="audit-item">
         <div class="audit-head"><div><div class="audit-type">${escapeHtml(AUDIT_LABELS[item.action_type]||item.action_type)}</div><div class="audit-target">${escapeHtml(item.target_display_name||item.target_account||"—")}</div></div><div class="audit-time">${escapeHtml(formatAuditTime(item.created_at))}</div></div>
         ${item.has_detail?`<button class="secondary audit-detail-btn" type="button" style="margin-top:8px">查看詳細</button><div class="audit-detail" style="display:none">${escapeHtml(auditDetailText(item))}</div>`:""}
-      </div>`).join("")||'<div class="empty">目前沒有異動紀錄</div>'}</div>`;
-    panel.querySelector(".audit-close").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
+      </div>`).join("")||'<div class="empty">目前沒有異動紀錄</div>'}</div>
+      <div class="audit-pagination">
+        <div class="audit-page-info">第 ${auditCurrentPage} / ${lastPage} 頁｜共 ${total} 筆</div>
+        <div class="audit-page-actions">
+          <button class="secondary audit-first" type="button" ${auditCurrentPage<=1?"disabled":""}>回到第一頁</button>
+          <button class="secondary audit-prev" type="button" ${auditCurrentPage<=1?"disabled":""}>上一頁</button>
+          <button class="secondary audit-next" type="button" ${auditCurrentPage>=lastPage?"disabled":""}>下一頁</button>
+          <button class="secondary audit-last" type="button" ${auditCurrentPage>=lastPage?"disabled":""}>到最後一頁</button>
+        </div>
+      </div>`;
+
+    panel.querySelector(".audit-close").addEventListener("click",()=>{
+      panel.style.display="none";
+      panel.innerHTML="";
+    });
+
     panel.querySelector(".audit-floating-home").addEventListener("click",()=>{
       const top=Math.max(panel.getBoundingClientRect().top+window.scrollY-12,0);
       window.scrollTo({top,behavior:"smooth"});
     });
+
+    panel.querySelector(".audit-first")?.addEventListener("click",()=>openAuditLogs(1));
+    panel.querySelector(".audit-prev")?.addEventListener("click",()=>openAuditLogs(auditCurrentPage-1));
+    panel.querySelector(".audit-next")?.addEventListener("click",()=>openAuditLogs(auditCurrentPage+1));
+    panel.querySelector(".audit-last")?.addEventListener("click",()=>openAuditLogs(lastPage));
+
     panel.querySelectorAll(".audit-detail-btn").forEach(btn=>btn.addEventListener("click",()=>{
       const detail=btn.nextElementSibling;
       const open=detail.style.display!=="none";
@@ -1207,7 +1285,8 @@ async function openAuditLogs(){
       btn.textContent=open?"查看詳細":"收起詳細";
     }));
   }catch(e){
-    panel.innerHTML=`<h3>我的異動日誌</h3><div class="status error" style="display:block">${escapeHtml(translateError(e.message))}</div>`;
+    panel.innerHTML=`<h3>我的異動日誌</h3><div class="local-status status"></div>`;
+    localStatus(panel,e.message||e,"error");
   }
 }
 
