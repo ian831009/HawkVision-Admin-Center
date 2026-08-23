@@ -455,11 +455,48 @@ body{
 }
 </style>
 
+
+<style id="hv-create-options-v214">
+.create-advanced-options{
+  margin-top:14px;
+  border:1px solid #dbeafe;
+  border-radius:14px;
+  overflow:hidden;
+}
+.create-option-block{
+  padding:14px;
+}
+.create-option-block+.create-option-block{
+  border-top:1px solid #e2e8f0;
+}
+.create-option-title{
+  font-weight:900;
+  margin-bottom:10px;
+}
+.create-permission-list{
+  display:grid;
+  gap:8px;
+}
+.create-permission-item{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  padding:9px 0;
+  border-bottom:1px solid #f1f5f9;
+}
+.create-permission-item:last-child{border-bottom:0}
+.create-permission-item>div{min-width:0}
+@media(max-width:700px){
+  .create-time-grid{grid-template-columns:1fr !important}
+}
+</style>
+
 </head>
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.1.3</div>
+  <div class="version">Admin Center v2.1.4</div>
 </header>
 
 <main>
@@ -545,6 +582,25 @@ body{
         <div><label for="newRole">商業層級</label><select id="newRole"></select></div>
         <div id="initialQuotaWrap"><label for="initialQuota">初始額度</label><input id="initialQuota" type="number" min="0" step="1" value="0" /></div>
       </div>
+
+      <div id="createAdvancedOptions" class="create-advanced-options" style="display:none">
+        <div class="create-option-block">
+          <div class="create-option-title">建立時開放權限（可複選）</div>
+          <div id="createPermissionOptions" class="create-permission-list"><div class="hint">請先選擇商業層級</div></div>
+        </div>
+
+        <div class="create-option-block">
+          <div class="create-option-title">建立時設定使用時間（選填）</div>
+          <div class="hint">四個欄位都留空＝不限制使用時間；只要設定時間範圍就會自動啟用，不分星期。</div>
+          <div class="grid create-time-grid">
+            <div><label for="createStartDate">開始日期</label><input id="createStartDate" type="date"></div>
+            <div><label for="createEndDate">到期日期</label><input id="createEndDate" type="date"></div>
+            <div><label for="createStartTime">每日開始時間</label><input id="createStartTime" type="time"></div>
+            <div><label for="createEndTime">每日結束時間</label><input id="createEndTime" type="time"></div>
+          </div>
+        </div>
+      </div>
+
       <div id="createStatus" class="status"></div>
       <div class="panel-actions">
         <button id="cancelCreateBtn" class="secondary" type="button">取消</button>
@@ -724,6 +780,9 @@ function resetCreateForm(){
   document.getElementById("newRole").value="";
   document.getElementById("initialQuota").value="0";
   document.getElementById("initialQuotaWrap").style.display="block";
+  document.getElementById("createAdvancedOptions").style.display="none";
+  document.getElementById("createPermissionOptions").innerHTML='<div class="hint">請先選擇商業層級</div>';
+  ["createStartDate","createEndDate","createStartTime","createEndTime"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""});
   document.getElementById("createStatus").style.display="none";
 }
 function closeAllPanels(){
@@ -751,7 +810,7 @@ function startSessionWatch(){
 }
 
 async function selfDetail(){
-  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:currentUser.id});
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:currentUser.id});
   if(error)throw new Error(translateError(error.message));
   return data;
 }
@@ -844,7 +903,7 @@ function updateRowSummary(row,child){
   if(account)account.textContent=`帳號：${child.account||"—"}`;
 }
 async function refreshChildDetailInPlace(manager,child,row){
-  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:child.user_id});
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:child.user_id});
   if(error)throw error;
   Object.assign(child,data||{});
   updateRowSummary(row,child);
@@ -860,9 +919,9 @@ async function refreshChildrenDataOnly(){
 
 async function renderManager(manager,child,row){
   const [{data,error},{data:takeoverPlan,error:takeoverError},{data:permissionPolicy,error:permissionPolicyError}]=await Promise.all([
-    supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:child.user_id}),
-    supabaseClient.rpc("hv_takeover_delete_plan_v4",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id}),
-    supabaseClient.rpc("hv_admin_product_access_v2",{p_target_user_id:child.user_id})
+    supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_takeover_delete_plan_v5",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_admin_product_access_v3",{p_target_user_id:child.user_id})
   ]);
   if(error){manager.innerHTML=`<div class="status error" style="display:block;">${escapeHtml(translateError(error.message))}</div>`;return}
   const detail={...child,...data},readonly=!detail.can_full_manage,noQuota=["member","co_admin"].includes(detail.business_role);
@@ -870,7 +929,7 @@ async function renderManager(manager,child,row){
   detail.permission_policy=permissionPolicyError?[]:(Array.isArray(permissionPolicy)?permissionPolicy:[]);
   const showPermissionMenu=detail.permission_policy.length>0;
   manager.innerHTML=`<div class="manager-title"><strong>${escapeHtml(detail.display_name||"未命名")}｜${escapeHtml(detail.role_name||ROLE_LABEL[detail.business_role]||"")}</strong><button class="secondary close-manager" type="button">收起</button></div>
-    ${readonly?`<div class="readonly-note">目前為跨層查看模式：額度、權限、使用時間只能查看。${detail.identity_access_mode==="creator_before_first_login"?" 此帳號由你建立且尚未完成首次登入，因此你暫時仍可修改名稱與密碼。":""}</div>`:""}
+    ${readonly?`<div class="readonly-note">目前為跨層查看模式：只能查看，不能異動。</div>`:""}
     <div class="manager-menu">
       ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
       ${showPermissionMenu?'<button class="soft-violet permission-menu" type="button">權限管理</button>':""}
@@ -929,7 +988,7 @@ async function renderManager(manager,child,row){
         localStatus(host,action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功","success");
         try{
           const [{data:fresh},{data:ownerRemainingData}]=await Promise.all([
-            supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:child.user_id}),
+            supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:child.user_id}),
             supabaseClient.rpc("hv_quota_remaining_v3",{p_user_id:child.parent_id})
           ]);
           if(fresh){
@@ -956,7 +1015,7 @@ async function renderManager(manager,child,row){
   manager.querySelector(".permission-menu")?.addEventListener("click",async()=>{
     host.innerHTML='<div class="subpanel"><h4>權限管理</h4><div class="empty">載入中…</div></div>';
     try{
-      const {data:products,error:productError}=await supabaseClient.rpc("hv_admin_product_access_v2",{p_target_user_id:detail.user_id});
+      const {data:products,error:productError}=await supabaseClient.rpc("hv_admin_product_access_v3",{p_target_user_id:detail.user_id});
       if(productError)throw productError;
       const rows=Array.isArray(products)?products:[];
       const canModify=rows.some(x=>x.can_modify===true);
@@ -994,7 +1053,7 @@ async function renderManager(manager,child,row){
             const enabled=input.checked===true;
             if(!original || enabled===Boolean(original.is_enabled))continue;
 
-            const {error:mutationError}=await supabaseClient.rpc("hv_set_user_product_access_v2",{
+            const {error:mutationError}=await supabaseClient.rpc("hv_set_user_product_access_v3",{
               p_target_user_id:detail.user_id,
               p_product_key:key,
               p_enabled:enabled
@@ -1002,7 +1061,7 @@ async function renderManager(manager,child,row){
 
             if(mutationError){
               const {data:verifyRows,error:verifyError}=await supabaseClient.rpc(
-                "hv_admin_product_access_v2",
+                "hv_admin_product_access_v3",
                 {p_target_user_id:detail.user_id}
               );
               if(verifyError)throw mutationError;
@@ -1019,7 +1078,7 @@ async function renderManager(manager,child,row){
           // 成功後只做非關鍵的背景同步；失敗不影響成功訊息。
           try{
             const {data:fresh}=await supabaseClient.rpc(
-              "hv_admin_product_access_v2",
+              "hv_admin_product_access_v3",
               {p_target_user_id:detail.user_id}
             );
             for(const input of host.querySelectorAll(".product-switch")){
@@ -1031,7 +1090,7 @@ async function renderManager(manager,child,row){
           localStatus(host,e.message||e,"error");
           try{
             const {data:fresh}=await supabaseClient.rpc(
-              "hv_admin_product_access_v2",
+              "hv_admin_product_access_v3",
               {p_target_user_id:detail.user_id}
             );
             for(const input of host.querySelectorAll(".product-switch")){
@@ -1048,49 +1107,50 @@ async function renderManager(manager,child,row){
   });
 
   manager.querySelector(".time-menu").addEventListener("click",async()=>{
-    host.innerHTML='<div class="subpanel"><h4>使用時間管理</h4><div class="empty">載入中…</div></div>';
+    host.innerHTML='<div class="subpanel"><div class="empty">載入中…</div></div>';
     try{
-      const {data:rule,error}=await supabaseClient.rpc("hv_admin_usage_rule_v1",{p_target_user_id:detail.user_id});
+      const {data:rule,error}=await supabaseClient.rpc("hv_admin_usage_rule_v2",{p_target_user_id:detail.user_id});
       if(error)throw error;
-      const weekdays=Array.isArray(rule?.allowed_weekdays)?rule.allowed_weekdays:[1,2,3,4,5,6,7];
-      const labels=["一","二","三","四","五","六","日"];
       const canModify=rule?.can_modify===true;
 
-      host.innerHTML=`<div class="subpanel"><h4>使用時間管理${canModify?"":"（查看）"}</h4>
-        <div class="switch-line"><div><strong>啟用時間限制</strong><div class="hint">關閉時不限制使用時間。</div></div><input class="usage-enabled" type="checkbox" ${rule?.is_enabled?"checked":""} ${canModify?"":"disabled"}></div>
+      host.innerHTML=`<div class="subpanel">
         <div class="grid">
           <div><label>開始日期</label><input class="usage-start-date" type="date" value="${escapeHtml(rule?.start_date||"")}" ${canModify?"":"disabled"}></div>
           <div><label>到期日期</label><input class="usage-end-date" type="date" value="${escapeHtml(rule?.end_date||"")}" ${canModify?"":"disabled"}></div>
           <div><label>每日開始時間</label><input class="usage-start-time" type="time" value="${escapeHtml((rule?.daily_start||"").slice(0,5))}" ${canModify?"":"disabled"}></div>
           <div><label>每日結束時間</label><input class="usage-end-time" type="time" value="${escapeHtml((rule?.daily_end||"").slice(0,5))}" ${canModify?"":"disabled"}></div>
         </div>
-        <label>允許星期</label>
-        <div class="weekday-grid">${labels.map((label,i)=>`<label><input class="weekday-check" type="checkbox" value="${i+1}" ${weekdays.includes(i+1)?"checked":""} ${canModify?"":"disabled"}>週${label}</label>`).join("")}</div>
-        <div class="hint">時區固定使用 Asia/Taipei。每日時間可跨午夜，例如 22:00～06:00。</div>
+        <div class="hint">四個欄位都留空＝不限制使用時間；設定完整時間範圍即自動啟用。時區固定 Asia/Taipei，每日時間可跨午夜，例如 22:00～06:00。</div>
         <div class="local-status status"></div>
         ${canModify?'<div class="panel-actions"><button class="primary save-usage" type="button">儲存時間設定</button></div>':""}
       </div>`;
 
       host.querySelector(".save-usage")?.addEventListener("click",async()=>{
-        const days=[...host.querySelectorAll(".weekday-check:checked")].map(x=>Number(x.value));
-        if(!days.length){localStatus(host,"至少選擇一個星期");return}
+        const startDate=host.querySelector(".usage-start-date").value||null;
+        const endDate=host.querySelector(".usage-end-date").value||null;
+        const startTime=host.querySelector(".usage-start-time").value||null;
+        const endTime=host.querySelector(".usage-end-time").value||null;
+        const values=[startDate,endDate,startTime,endTime];
+        const any=values.some(Boolean),all=values.every(Boolean);
+        if(any&&!all){localStatus(host,"如要設定使用時間，開始日期、到期日期、每日開始時間、每日結束時間都必須填寫");return}
         try{
-          const {error}=await supabaseClient.rpc("hv_set_usage_rule_v1",{
+          const {error}=await supabaseClient.rpc("hv_set_usage_rule_v2",{
             p_target_user_id:detail.user_id,
-            p_is_enabled:host.querySelector(".usage-enabled").checked===true,
-            p_start_date:host.querySelector(".usage-start-date").value||null,
-            p_end_date:host.querySelector(".usage-end-date").value||null,
-            p_allowed_weekdays:days,
-            p_daily_start:host.querySelector(".usage-start-time").value||null,
-            p_daily_end:host.querySelector(".usage-end-time").value||null,
+            p_is_enabled:all,
+            p_start_date:startDate,
+            p_end_date:endDate,
+            p_allowed_weekdays:[1,2,3,4,5,6,7],
+            p_daily_start:startTime,
+            p_daily_end:endTime,
             p_timezone:"Asia/Taipei"
           });
           if(error)throw error;
-          localStatus(host,"✓ 使用時間設定成功","success");
+          localStatus(host,all?"✓ 使用時間設定成功":"✓ 已清除使用時間限制","success");
         }catch(e){localStatus(host,e.message||e,"error")}
       });
     }catch(e){
-      host.innerHTML=`<div class="subpanel"><h4>使用時間管理</h4><div class="status error" style="display:block">${escapeHtml(translateError(e.message))}</div></div>`;
+      host.innerHTML=`<div class="subpanel"><div class="local-status status"></div></div>`;
+      localStatus(host,e.message||e,"error");
     }
   });
 
@@ -1110,7 +1170,7 @@ async function renderManager(manager,child,row){
         // API 若回報錯誤，才讀正式資料確認是否其實已成功。
         try{
           const {data:verifyDetail,error:verifyError}=await supabaseClient.rpc(
-            "hv_admin_account_detail_v5",
+            "hv_admin_account_detail_v6",
             {p_target_user_id:child.user_id}
           );
           if(!verifyError && verifyDetail && String(verifyDetail.display_name||"").trim()===value){
@@ -1180,7 +1240,7 @@ async function renderManager(manager,child,row){
 async function loadContext(closePanels=true){
   if(closePanels)closeAllPanels();
   let ctx=contextStack.at(-1);
-  const {data:detail,error:detailError}=await supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:ctx.user_id});
+  const {data:detail,error:detailError}=await supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:ctx.user_id});
   if(!detailError&&detail){ctx={...ctx,...detail};contextStack[contextStack.length-1]=ctx}
   renderContextHeader();
   document.getElementById("childList").innerHTML='<div class="empty">載入中…</div>';
@@ -1199,18 +1259,78 @@ function populateRoleSelect(){
   const sel=document.getElementById("newRole");
   sel.innerHTML='<option value="">請選擇層級</option>'+createAllowedRoles.map(r=>`<option value="${r}">${ROLE_LABEL[r]||r}</option>`).join("");
 }
+async function loadCreateAdvancedOptions(role){
+  const ctx=contextStack.at(-1);
+  const wrap=document.getElementById("createAdvancedOptions");
+  const list=document.getElementById("createPermissionOptions");
+  if(!role){
+    wrap.style.display="none";
+    list.innerHTML='<div class="hint">請先選擇商業層級</div>';
+    return;
+  }
+  wrap.style.display="block";
+  list.innerHTML='<div class="hint">載入可授予權限…</div>';
+  try{
+    const {data,error}=await supabaseClient.rpc("hv_grantable_products_for_new_account_v1",{
+      p_parent_user_id:ctx.user_id,
+      p_target_role:role
+    });
+    if(error)throw error;
+    const rows=Array.isArray(data)?data:[];
+    list.innerHTML=rows.length?rows.map(p=>`<label class="create-permission-item">
+      <div><strong>${escapeHtml(p.display_name||p.product_key)}</strong><div class="hint">${escapeHtml(p.product_key)}</div></div>
+      <input class="create-product-check" type="checkbox" value="${escapeHtml(p.product_key)}">
+    </label>`).join(""):'<div class="hint">目前沒有可在建立時開放的產品權限</div>';
+  }catch(e){
+    list.innerHTML=`<div class="hint" style="color:#991b1b">${escapeHtml(translateError(e.message))}</div>`;
+  }
+}
+function collectCreateUsage(){
+  const start_date=document.getElementById("createStartDate").value||null;
+  const end_date=document.getElementById("createEndDate").value||null;
+  const daily_start=document.getElementById("createStartTime").value||null;
+  const daily_end=document.getElementById("createEndTime").value||null;
+  const vals=[start_date,end_date,daily_start,daily_end];
+  const any=vals.some(Boolean),all=vals.every(Boolean);
+  if(any&&!all)throw new Error("建立時如要設定使用時間，四個時間欄位都必須填寫");
+  return all?{start_date,end_date,daily_start,daily_end,timezone:"Asia/Taipei"}:null;
+}
 async function createAccount(){
-  const ctx=contextStack.at(-1),name=document.getElementById("newName").value.trim(),account=document.getElementById("newAccount").value.trim(),password=document.getElementById("newPassword").value,role=document.getElementById("newRole").value;
+  const ctx=contextStack.at(-1);
+  const name=document.getElementById("newName").value.trim();
+  const account=document.getElementById("newAccount").value.trim();
+  const password=document.getElementById("newPassword").value;
+  const role=document.getElementById("newRole").value;
   const quota=["member","co_admin"].includes(role)?0:Number(document.getElementById("initialQuota").value||0);
   const status=document.getElementById("createStatus");
+
   try{
-    if(!name)throw new Error("請輸入名稱");validateAccountLike(account,"帳號");validateAccountLike(password,"密碼");if(!role)throw new Error("請選擇商業層級");if(!Number.isInteger(quota)||quota<0)throw new Error("初始額度必須是0以上整數");
-    await api("/create-account",{parent_user_id:ctx.user_id,display_name:name,account,password,business_role:role,initial_quota:quota});
-    const createStatus=document.getElementById("createStatus");
-    setStatus(createStatus,role==="member"?"✓ 會員帳號建立成功":role==="co_admin"?"✓ 共同管理員建立成功":`✓ 帳號建立成功${quota>0?`，已分配額度 ${quota}`:""}`,"success",true);
+    if(!name)throw new Error("請輸入名稱");
+    validateAccountLike(account,"帳號");
+    validateAccountLike(password,"密碼");
+    if(!role)throw new Error("請選擇商業層級");
+    if(!Number.isInteger(quota)||quota<0)throw new Error("初始額度必須是0以上整數");
+
+    const product_keys=[...document.querySelectorAll(".create-product-check:checked")].map(x=>x.value);
+    const usage_rule=collectCreateUsage();
+
+    const result=await api("/create-account",{
+      parent_user_id:ctx.user_id,
+      display_name:name,
+      account,
+      password,
+      business_role:role,
+      initial_quota:quota,
+      product_keys,
+      usage_rule
+    });
+
     resetCreateForm();
+    setStatus(status,`✓ ${result.message||"帳號建立成功"}`,"success",true);
     await refreshChildrenDataOnly();
-  }catch(e){setStatus(status,"建立失敗："+translateError(e.message),"error",true)}
+  }catch(e){
+    setStatus(status,"建立失敗："+(e.message||e),"error",true);
+  }
 }
 
 async function loadDashboard(){
@@ -1279,8 +1399,7 @@ function boolLabel(v){return v===true?"開啟":v===false?"關閉":"未設定"}
 function dateTimeRange(d={}){
   const dates=(d.start_date||d.end_date)?`${d.start_date||"不限"} ～ ${d.end_date||"不限"}`:"不限日期";
   const times=(d.daily_start||d.daily_end)?`${String(d.daily_start||"不限").slice(0,5)} ～ ${String(d.daily_end||"不限").slice(0,5)}`:"不限時段";
-  const days=Array.isArray(d.allowed_weekdays)?d.allowed_weekdays.map(x=>["","一","二","三","四","五","六","日"][Number(x)]||x).join("、"):"不限";
-  return `${dates}｜週${days}｜${times}`;
+  return `${dates}｜${times}`;
 }
 function auditSummary(item){
   const n=item.new_data||{},o=item.old_data||{};
@@ -1503,8 +1622,12 @@ document.getElementById("openCreateBtn").addEventListener("click",()=>{clearAcco
 });
 document.getElementById("cancelCreateBtn").addEventListener("click",()=>{document.getElementById("createPanel").style.display="none";resetCreateForm()});
 document.getElementById("createBtn").addEventListener("click",createAccount);
-document.getElementById("newRole").addEventListener("change",e=>{
-  const noQuota=["member","co_admin"].includes(e.target.value);document.getElementById("initialQuotaWrap").style.display=noQuota?"none":"block";if(noQuota)document.getElementById("initialQuota").value="0";
+document.getElementById("newRole").addEventListener("change",async e=>{
+  const role=e.target.value;
+  const noQuota=["member","co_admin"].includes(role);
+  document.getElementById("initialQuotaWrap").style.display=noQuota?"none":"block";
+  if(noQuota)document.getElementById("initialQuota").value="0";
+  await loadCreateAdvancedOptions(role);
 });
 document.getElementById("accountSearchBtn").addEventListener("click",()=>{
   appliedSearch=document.getElementById("accountSearch").value.trim();
