@@ -120,7 +120,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.0.0</div>
+  <div class="version">Admin Center v2.0.1</div>
 </header>
 
 <main>
@@ -466,7 +466,7 @@ function rowSuccess(row,msg){
 async function renderManager(manager,child,row){
   const [{data,error},{data:takeoverPlan,error:takeoverError}]=await Promise.all([
     supabaseClient.rpc("hv_admin_account_detail_v3",{p_target_user_id:child.user_id}),
-    supabaseClient.rpc("hv_takeover_delete_plan_v3",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id})
+    supabaseClient.rpc("hv_takeover_delete_plan_v4",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id})
   ]);
   if(error){manager.innerHTML=`<div class="status error" style="display:block;">${escapeHtml(translateError(error.message))}</div>`;return}
   const detail={...child,...data},readonly=!detail.can_full_manage,noQuota=["member","co_admin"].includes(detail.business_role);
