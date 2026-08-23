@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.2.3</div>
+  <div class="version">Admin Center v2.2.4</div>
 </header>
 
 <main>
@@ -1149,7 +1149,7 @@ async function renderManager(manager,child,row){
         </div>
         <div class="hint">兩個欄位都留空＝不限合約時間。合約尚未開始或到期時，此帳號與其所有下屬暫時不能使用；資料、權限、額度與會員時數包都會保留，續約後自動恢復。</div>
         <div class="local-status status"></div>
-        ${canModify?'<div class="panel-actions"><button class="primary save-contract" type="button">儲存合約時間</button></div>':""}
+        ${canModify?'<div class="panel-actions"><button class="primary save-contract" type="button">儲存合約時間</button><button class="secondary clear-contract" type="button">清空設定</button></div>':""}
       </div>`;
       host.querySelector(".save-contract")?.addEventListener("click",async()=>{
         const sd=host.querySelector(".contract-start-date").value||null;
@@ -1169,6 +1169,26 @@ async function renderManager(manager,child,row){
           });
           if(error)throw error;
           localStatus(host,s?"✓ 合約時間設定成功":"✓ 已清除合約時間限制","success");
+          try{applyEffectiveStatusToRow(row,child,await getEffectiveStatus(detail.user_id))}catch(_){}
+        }catch(e){localStatus(host,e.message||e,"error")}
+      });
+
+      host.querySelector(".clear-contract")?.addEventListener("click",async()=>{
+        if(!confirm(`確定要清空「${detail.display_name||detail.account}」的合約時間設定嗎？\n\n清空後此帳號將改為無限期使用，直到再次設定合約時間或被人工停用。`))return;
+        try{
+          const {error}=await supabaseClient.rpc("hv_set_contract_v2",{
+            p_target_user_id:detail.user_id,
+            p_starts_at:null,
+            p_ends_at:null
+          });
+          if(error)throw error;
+
+          host.querySelector(".contract-start-date").value="";
+          host.querySelector(".contract-start-time").value="";
+          host.querySelector(".contract-end-date").value="";
+          host.querySelector(".contract-end-time").value="";
+
+          localStatus(host,"✓ 合約時間已清空，現在為無限期使用","success");
           try{applyEffectiveStatusToRow(row,child,await getEffectiveStatus(detail.user_id))}catch(_){}
         }catch(e){localStatus(host,e.message||e,"error")}
       });
