@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.2.2</div>
+  <div class="version">Admin Center v2.2.3</div>
 </header>
 
 <main>
@@ -888,12 +888,30 @@ function renderChildren(){
       await renderManager(manager,child,row);
     });
     row.querySelector(".enter-btn")?.addEventListener("click",async()=>{clearAccountSearch();closeAllPanels();contextStack.push(child);await loadContext(false)});
+    getEffectiveStatus(child.user_id).then(a=>applyEffectiveStatusToRow(row,child,a)).catch(()=>{});
   }
 }
 function localStatus(host,msg,type="error"){let el=host.querySelector(".local-status");if(!el){el=document.createElement("div");el.className="status local-status";host.appendChild(el)}setStatus(el,msg,type,true)}
 function rowSuccess(row,msg){notify(msg,"success")}
 
 
+async function getEffectiveStatus(userId){
+  const {data,error}=await supabaseClient.rpc("hv_account_effective_status_v1",{p_user_id:userId});
+  if(error)throw error;
+  return data||{allowed:false,reason:"UNKNOWN",status_label:"狀態未知"};
+}
+function effectiveStatusLabel(access){return access?.status_label||"狀態未知"}
+function applyEffectiveStatusToRow(row,child,access){
+  if(!row)return;
+  row.querySelectorAll(".effective-status-badge").forEach(x=>x.remove());
+  const title=row.querySelector(".child-title");
+  if(title){
+    const b=document.createElement("span");
+    b.className=`badge effective-status-badge ${access?.allowed===true?"":"disabled"}`;
+    b.textContent=effectiveStatusLabel(access);
+    title.appendChild(b);
+  }
+}
 function updateRowSummary(row,child){
   if(!row)return;
   row.classList.toggle("disabled-account",child.is_enabled===false);
@@ -920,10 +938,11 @@ async function refreshChildrenDataOnly(){
 }
 
 async function renderManager(manager,child,row){
-  const [{data,error},{data:takeoverPlan,error:takeoverError},{data:permissionPolicy,error:permissionPolicyError}]=await Promise.all([
+  const [{data,error},{data:takeoverPlan,error:takeoverError},{data:permissionPolicy,error:permissionPolicyError},{data:effectiveAccess,error:effectiveError}]=await Promise.all([
     supabaseClient.rpc("hv_admin_account_detail_v6",{p_target_user_id:child.user_id}),
     supabaseClient.rpc("hv_takeover_delete_plan_v5",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id}),
-    supabaseClient.rpc("hv_admin_product_access_v3",{p_target_user_id:child.user_id})
+    supabaseClient.rpc("hv_admin_product_access_v3",{p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_account_effective_status_v1",{p_user_id:child.user_id})
   ]);
   if(error){manager.innerHTML=`<div class="status error" style="display:block;">${escapeHtml(translateError(error.message))}</div>`;return}
   const detail={...child,...data},readonly=!detail.can_full_manage,noQuota=["member","co_admin"].includes(detail.business_role);
@@ -931,6 +950,7 @@ async function renderManager(manager,child,row){
   detail.permission_policy=permissionPolicyError?[]:(Array.isArray(permissionPolicy)?permissionPolicy:[]);
   const showPermissionMenu=detail.permission_policy.length>0;
   manager.innerHTML=`<div class="manager-title"><strong>${escapeHtml(detail.display_name||"未命名")}｜${escapeHtml(detail.role_name||ROLE_LABEL[detail.business_role]||"")}</strong><button class="secondary close-manager" type="button">收起</button></div>
+    <div class="status ${effectiveAccess?.allowed===true?"success":"error"}" style="display:block;margin-bottom:12px">目前有效狀態：${escapeHtml(effectiveError?"狀態讀取失敗":effectiveStatusLabel(effectiveAccess))}${effectiveAccess?.blocking_display_name&&effectiveAccess?.blocking_user_id!==detail.user_id?`<br><span class="hint">限制來源：${escapeHtml(effectiveAccess.blocking_display_name)}</span>`:""}</div>
     ${readonly?`<div class="readonly-note">目前為跨層查看模式：只能查看，不能異動。</div>`:""}
     <div class="manager-menu">
       ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
@@ -1149,6 +1169,7 @@ async function renderManager(manager,child,row){
           });
           if(error)throw error;
           localStatus(host,s?"✓ 合約時間設定成功":"✓ 已清除合約時間限制","success");
+          try{applyEffectiveStatusToRow(row,child,await getEffectiveStatus(detail.user_id))}catch(_){}
         }catch(e){localStatus(host,e.message||e,"error")}
       });
     }catch(e){host.innerHTML='<div class="subpanel"><div class="local-status status"></div></div>';localStatus(host,e.message||e,"error")}
