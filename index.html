@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.2.1</div>
+  <div class="version">Admin Center v2.2.2</div>
 </header>
 
 <main>
@@ -780,7 +780,7 @@ function resetCreateForm(){
   document.getElementById("initialQuotaWrap").style.display="block";
   document.getElementById("createAdvancedOptions").style.display="none";
   document.getElementById("createPermissionOptions").innerHTML='<div class="hint">請先選擇商業層級</div>';
-  ["createContractStart","createContractEnd"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""});
+  ["createContractStartDate","createContractStartTime","createContractEndDate","createContractEndTime"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""});
   document.getElementById("createStatus").style.display="none";
 }
 function closeAllPanels(){
@@ -802,7 +802,7 @@ function startSessionWatch(){
   if(sessionWatch)clearInterval(sessionWatch);
   sessionWatch=setInterval(async()=>{
     if(!currentUser)return;
-    const {data,error}=await supabaseClient.rpc("hv_my_effective_access_v1");
+    const {data,error}=await supabaseClient.rpc("hv_effective_access_v2",{p_user_id:currentUser.id});
     if(!error&&data&&data.allowed===false){
       await supabaseClient.auth.signOut().catch(()=>{});
       currentUser=null;currentSelf=null;showOnly("login");
@@ -1122,20 +1122,27 @@ async function renderManager(manager,child,row){
       };
       host.innerHTML=`<div class="subpanel">
         <div class="grid">
-          <div><label>合約開始時間</label><input class="contract-start" type="datetime-local" value="${escapeHtml(localValue(rule?.contract_starts_at))}" ${canModify?"":"disabled"}></div>
-          <div><label>合約結束時間</label><input class="contract-end" type="datetime-local" value="${escapeHtml(localValue(rule?.contract_ends_at))}" ${canModify?"":"disabled"}></div>
+          <div><label>合約開始日期</label><input class="contract-start-date" type="date" value="${escapeHtml((localValue(rule?.contract_starts_at)||"").slice(0,10))}" ${canModify?"":"disabled"}></div>
+          <div><label>合約開始時間（24小時制）</label><input class="contract-start-time" type="time" step="60" value="${escapeHtml((localValue(rule?.contract_starts_at)||"").slice(11,16))}" ${canModify?"":"disabled"}></div>
+          <div><label>合約結束日期</label><input class="contract-end-date" type="date" value="${escapeHtml((localValue(rule?.contract_ends_at)||"").slice(0,10))}" ${canModify?"":"disabled"}></div>
+          <div><label>合約結束時間（24小時制）</label><input class="contract-end-time" type="time" step="60" value="${escapeHtml((localValue(rule?.contract_ends_at)||"").slice(11,16))}" ${canModify?"":"disabled"}></div>
         </div>
         <div class="hint">兩個欄位都留空＝不限合約時間。合約尚未開始或到期時，此帳號與其所有下屬暫時不能使用；資料、權限、額度與會員時數包都會保留，續約後自動恢復。</div>
         <div class="local-status status"></div>
         ${canModify?'<div class="panel-actions"><button class="primary save-contract" type="button">儲存合約時間</button></div>':""}
       </div>`;
       host.querySelector(".save-contract")?.addEventListener("click",async()=>{
-        const s=host.querySelector(".contract-start").value||null;
-        const e=host.querySelector(".contract-end").value||null;
-        if(Boolean(s)!==Boolean(e)){localStatus(host,"合約開始時間與結束時間必須一起設定");return}
+        const sd=host.querySelector(".contract-start-date").value||null;
+        const st=host.querySelector(".contract-start-time").value||null;
+        const ed=host.querySelector(".contract-end-date").value||null;
+        const et=host.querySelector(".contract-end-time").value||null;
+        const any=[sd,st,ed,et].some(Boolean),all=[sd,st,ed,et].every(Boolean);
+        if(any&&!all){localStatus(host,"合約開始日期、開始時間、結束日期、結束時間必須完整設定");return}
+        const s=all?`${sd}T${st}:00`:null;
+        const e=all?`${ed}T${et}:00`:null;
         if(s&&e&&new Date(e)<=new Date(s)){localStatus(host,"合約結束時間必須晚於開始時間");return}
         try{
-          const {error}=await supabaseClient.rpc("hv_set_contract_v1",{
+          const {error}=await supabaseClient.rpc("hv_set_contract_v2",{
             p_target_user_id:detail.user_id,
             p_starts_at:s?new Date(s).toISOString():null,
             p_ends_at:e?new Date(e).toISOString():null
@@ -1372,10 +1379,12 @@ async function loadCreateAdvancedOptions(role){
         </div>`;
     }else{
       scheduleBlock.innerHTML=`<div class="create-option-title">建立時設定合約時間（選填）</div>
-        <div class="hint">合約開始與結束時間都留空＝不限合約時間。</div>
+        <div class="hint">全部留空＝不限合約時間；時間採 24 小時制。</div>
         <div class="grid create-time-grid">
-          <div><label for="createContractStart">合約開始時間</label><input id="createContractStart" type="datetime-local"></div>
-          <div><label for="createContractEnd">合約結束時間</label><input id="createContractEnd" type="datetime-local"></div>
+          <div><label for="createContractStartDate">合約開始日期</label><input id="createContractStartDate" type="date"></div>
+          <div><label for="createContractStartTime">合約開始時間（24小時制）</label><input id="createContractStartTime" type="time" step="60"></div>
+          <div><label for="createContractEndDate">合約結束日期</label><input id="createContractEndDate" type="date"></div>
+          <div><label for="createContractEndTime">合約結束時間（24小時制）</label><input id="createContractEndTime" type="time" step="60"></div>
         </div>`;
     }
   }
@@ -1404,11 +1413,16 @@ function collectCreateSchedule(role){
       throw new Error("會員時數包的每包時數與包數都必須是 1～999 的整數");
     return {contract:null,hour_package:{hours:h,count:c}};
   }
-  const start=document.getElementById("createContractStart")?.value||null;
-  const end=document.getElementById("createContractEnd")?.value||null;
-  if(Boolean(start)!==Boolean(end))throw new Error("合約開始時間與合約結束時間必須一起設定");
-  if(start&&end&&new Date(end)<=new Date(start))throw new Error("合約結束時間必須晚於開始時間");
-  return {contract:start?{starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString()}:null,hour_package:null};
+  const sd=document.getElementById("createContractStartDate")?.value||null;
+  const st=document.getElementById("createContractStartTime")?.value||null;
+  const ed=document.getElementById("createContractEndDate")?.value||null;
+  const et=document.getElementById("createContractEndTime")?.value||null;
+  const any=[sd,st,ed,et].some(Boolean),all=[sd,st,ed,et].every(Boolean);
+  if(any&&!all)throw new Error("建立時合約日期與時間必須完整設定");
+  if(!all)return {contract:null,hour_package:null};
+  const start=`${sd}T${st}:00`,end=`${ed}T${et}:00`;
+  if(new Date(end)<=new Date(start))throw new Error("合約結束時間必須晚於開始時間");
+  return {contract:{starts_at:new Date(start).toISOString(),ends_at:new Date(end).toISOString()},hour_package:null};
 }
 async function createAccount(){
   const ctx=contextStack.at(-1);
@@ -1455,7 +1469,7 @@ async function loadDashboard(){
   if(hasAdminAccess!==true){await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});throw new Error("此帳號沒有管理中心使用權限");}
 
   currentSelf=await selfDetail();
-  const {data:effectiveAccess,error:effectiveError}=await supabaseClient.rpc("hv_my_effective_access_v1");
+  const {data:effectiveAccess,error:effectiveError}=await supabaseClient.rpc("hv_effective_access_v2",{p_user_id:currentUser.id});
   if(effectiveError)throw effectiveError;
   if(effectiveAccess?.allowed===false){
     await supabaseClient.auth.signOut().catch(()=>{});
