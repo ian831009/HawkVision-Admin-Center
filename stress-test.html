@@ -3,174 +3,345 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>HawkVision Stress Lab v1.0.0</title>
+<title>HawkVision Stress Lab v1.1.0</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f5f7fb}
-*{box-sizing:border-box}body{margin:0}.wrap{max-width:980px;margin:auto;padding:20px}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 18px rgba(0,0,0,.04)}
-h1{font-size:22px;margin:0 0 6px}.ver{font-size:13px;color:#6b7280}.hint{font-size:13px;color:#6b7280;line-height:1.6}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.full{grid-column:1/-1}
-label{display:block;font-size:13px;margin-bottom:6px;color:#374151}
-input,select,button{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:11px;font-size:15px;background:#fff}
-button{cursor:pointer;font-weight:700}.primary{background:#111827;color:#fff}.danger{background:#fff;color:#b91c1c;border-color:#fecaca}
-.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{width:auto;min-width:150px}
-.status{display:none;margin-top:12px;padding:10px;border-radius:10px;font-size:14px}.ok{display:block;background:#ecfdf5;color:#065f46}.err{display:block;background:#fef2f2;color:#991b1b}
-.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
-.metric{border:1px solid #e5e7eb;border-radius:12px;padding:12px}.metric b{display:block;font-size:20px;margin-top:4px}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{text-align:left;padding:9px;border-bottom:1px solid #eee}
-.pass{color:#047857;font-weight:700}.warn{color:#b45309;font-weight:700}.fail{color:#b91c1c;font-weight:700}
-@media(max-width:720px){.grid,.metrics{grid-template-columns:1fr}.wrap{padding:12px}.actions button{width:100%}}
+:root{
+  --bg:#f3f6fb;--card:#fff;--line:#e2e8f0;--text:#0f172a;--muted:#64748b;
+  --blue:#2563eb;--blueSoft:#dbeafe;--red:#dc2626;--redSoft:#fee2e2;
+  --greenSoft:#dcfce7;--violetSoft:#ede9fe;--amberSoft:#fef3c7;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif
+}
+*{box-sizing:border-box}
+html,body{max-width:100%;overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--text)}
+.wrap{max-width:1100px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:16px;box-shadow:0 3px 15px rgba(0,0,0,.06);padding:18px;margin-bottom:16px}
+.top,.toolbar,.context,.child-head,.actions,.pager{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+h1,h2,h3{margin:0 0 8px}.ver,.hint,.muted{font-size:13px;color:var(--muted);line-height:1.6}
+button,input,select{font:inherit;border-radius:10px;border:1px solid #cbd5e1;padding:10px 12px}
+button{font-weight:700;cursor:pointer;background:#e5e7eb}
+button:disabled{opacity:.5;cursor:not-allowed}
+.primary{background:var(--blue);color:white;border-color:var(--blue)}
+.danger{background:var(--redSoft);color:#991b1b;border-color:#fecaca}
+.soft{background:var(--blueSoft);color:#1d4ed8;border:0}
+.soft-violet{background:var(--violetSoft);color:#6d28d9;border:0}
+input{min-width:220px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.status{display:none;margin-top:10px;padding:10px;border-radius:10px;font-size:14px}
+.ok{display:block;background:#ecfdf5;color:#065f46}.err{display:block;background:#fef2f2;color:#991b1b}
+.banner{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:12px;font-weight:700;margin-bottom:14px}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.metric{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}.metric b{display:block;font-size:20px;margin-top:4px}
+.child-list{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;margin-top:12px}
+.child-row{padding:13px;border-bottom:1px solid var(--line)}.child-row:last-child{border-bottom:0}
+.child-title{font-weight:800}.child-account{font-size:13px;color:var(--muted);margin-top:4px}
+.badge{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:800;background:#dbeafe;color:#1d4ed8;margin-left:6px}
+.badge.member{background:#f3e8ff;color:#7e22ce}.badge.sub{background:#fef3c7;color:#92400e}
+.breadcrumb{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.breadcrumb button{border:0;background:transparent;color:#2563eb;padding:4px 6px}
+.pager{justify-content:center;margin-top:12px}.pager button{min-width:90px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{padding:9px;border-bottom:1px solid #eee;text-align:left}
+.pass{color:#047857;font-weight:800}.warn{color:#b45309;font-weight:800}.fail{color:#b91c1c;font-weight:800}
+.hidden{display:none!important}
+@media(max-width:720px){
+  .wrap{padding:10px}.grid,.metrics{grid-template-columns:1fr}
+  input,select,.toolbar .actions,button{max-width:100%}
+  .actions button,.pager button{flex:1 1 42%}
+}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="card">
-    <h1>HawkVision Stress Lab</h1>
-    <div class="ver">v1.0.0｜獨立壓力測試工具，不寫入正式帳號資料</div>
-    <p class="hint">測試資料只存在 <code>hv_stress_*</code> 專用資料表。只有最高管理員可以建立、測試與刪除。三個等級：511、2,047、8,191 個節點。</p>
+    <div class="top">
+      <div>
+        <h1>HawkVision Stress Lab</h1>
+        <div class="ver">v1.1.0｜管理中心視覺模擬</div>
+      </div>
+      <button id="logoutBtn" class="hidden">登出</button>
+    </div>
+    <div class="banner">這裡看到的全部都是假帳號。只存在 hv_stress_* 測試資料表，不會出現在正式管理中心，也不會影響正式額度、權限、合約、會員時數或牌局資料。</div>
   </div>
 
-  <div class="card" id="loginCard">
+  <div id="loginCard" class="card">
+    <h3>最高管理員登入</h3>
     <div class="grid">
-      <div><label>最高管理員帳號</label><input id="account" autocomplete="username"></div>
-      <div><label>密碼</label><input id="password" type="password" autocomplete="current-password"></div>
+      <div><div class="hint">帳號</div><input id="account" autocomplete="username"></div>
+      <div><div class="hint">密碼</div><input id="password" type="password" autocomplete="current-password"></div>
     </div>
-    <div class="actions" style="margin-top:12px"><button class="primary" id="loginBtn">登入壓力測試</button></div>
+    <div class="actions" style="margin-top:12px"><button id="loginBtn" class="primary">登入</button></div>
     <div id="loginStatus" class="status"></div>
   </div>
 
-  <div class="card" id="toolCard" style="display:none">
-    <div class="grid">
+  <div id="toolCard" class="card hidden">
+    <div class="toolbar">
       <div>
-        <label>測試等級</label>
+        <strong>建立測試資料</strong>
+        <div class="hint">建議依序 511 → 清除 → 2047 → 清除 → 8191</div>
+      </div>
+      <div class="actions">
         <select id="scale">
-          <option value="511">Level 1｜511 nodes + 5,110 logs</option>
-          <option value="2047">Level 2｜2,047 nodes + 20,470 logs</option>
-          <option value="8191">Level 3｜8,191 nodes + 81,910 logs</option>
+          <option value="511">511 個節點</option>
+          <option value="2047">2,047 個節點</option>
+          <option value="8191">8,191 個節點</option>
+        </select>
+        <button id="createBtn" class="primary">建立</button>
+        <button id="cleanupBtn" class="danger">刪除此測試</button>
+      </div>
+    </div>
+    <div id="toolStatus" class="status"></div>
+  </div>
+
+  <div id="summaryCard" class="card hidden">
+    <div class="metrics">
+      <div class="metric">節點數<b id="nodeCount">—</b></div>
+      <div class="metric">Audit 數<b id="auditCount">—</b></div>
+      <div class="metric">整樹深度<b id="treeDepth">—</b></div>
+      <div class="metric">建立耗時<b id="createMs">—</b></div>
+    </div>
+  </div>
+
+  <div id="mockCard" class="card hidden">
+    <div class="toolbar">
+      <div class="actions">
+        <input id="searchInput" type="search" placeholder="搜尋名稱或帳號">
+        <button id="searchBtn">搜尋</button>
+        <button id="clearSearchBtn">清除搜尋</button>
+      </div>
+      <div class="actions">
+        <span id="countText" class="muted">—</span>
+        <select id="pageSize">
+          <option value="20">每頁 20</option>
+          <option value="50">每頁 50</option>
+          <option value="100">每頁 100</option>
         </select>
       </div>
+    </div>
+
+    <div id="breadcrumb" class="breadcrumb"></div>
+    <div class="context">
       <div>
-        <label>重複測試次數</label>
+        <div class="muted">目前查看</div>
+        <strong id="contextTitle">—</strong>
+      </div>
+      <div id="queryMs" class="muted"></div>
+    </div>
+
+    <div id="childList" class="child-list"></div>
+    <div id="pager" class="pager"></div>
+  </div>
+
+  <div id="benchCard" class="card hidden">
+    <div class="toolbar">
+      <div>
+        <strong>效能測試</strong>
+        <div class="hint">測試目前 Run 的列表、搜尋、遞迴樹與 Audit 分頁。</div>
+      </div>
+      <div class="actions">
         <select id="repeat">
           <option value="10">10 次</option>
           <option value="20" selected>20 次</option>
           <option value="50">50 次</option>
         </select>
+        <button id="benchBtn" class="soft">執行效能測試</button>
       </div>
-    </div>
-    <div class="actions" style="margin-top:12px">
-      <button class="primary" id="createRunBtn">建立測試資料</button>
-      <button id="runBenchBtn">執行效能測試</button>
-      <button class="danger" id="cleanupBtn">刪除此測試資料</button>
-    </div>
-    <div id="toolStatus" class="status"></div>
-  </div>
-
-  <div class="card" id="resultCard" style="display:none">
-    <h1 style="font-size:18px">測試結果</h1>
-    <div id="runInfo" class="hint"></div>
-    <div class="metrics">
-      <div class="metric">節點數<b id="nodeCount">—</b></div>
-      <div class="metric">Audit 數<b id="auditCount">—</b></div>
-      <div class="metric">整樹深度<b id="treeDepth">—</b></div>
-      <div class="metric">建立資料耗時<b id="createMs">—</b></div>
     </div>
     <table>
       <thead><tr><th>項目</th><th>p50</th><th>p95</th><th>最大</th><th>判定</th></tr></thead>
-      <tbody id="resultBody"></tbody>
+      <tbody id="benchBody"></tbody>
     </table>
-    <p class="hint">建議判定：p95 ≤ 300ms = 通過；300–800ms = 注意；&gt;800ms = 需優化。這是 RPC 往返時間，包含瀏覽器→Supabase 網路延遲。</p>
+  </div>
+
+  <div id="auditCard" class="card hidden">
+    <div class="toolbar">
+      <div>
+        <strong>Audit 保留規則模擬</strong>
+        <div class="hint">只模擬，不會修改正式異動日誌。可測 30 天 + 每帳號最多 200 筆的效果。</div>
+      </div>
+      <div class="actions">
+        <select id="logsPerNode">
+          <option value="10">每帳號 10 筆</option>
+          <option value="50">每帳號 50 筆</option>
+          <option value="250">每帳號 250 筆（重壓）</option>
+        </select>
+        <button id="seedAuditBtn">建立 Audit 壓力</button>
+        <button id="previewRetentionBtn" class="soft-violet">預覽 30天/200筆 規則</button>
+      </div>
+    </div>
+    <div id="auditStatus" class="status"></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const VERSION="1.0.0";
+const VERSION="1.1.0";
 const SUPABASE_URL="https://rwxujvpakpemiwkitltk.supabase.co";
 const SUPABASE_KEY="sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let currentRun=null;
+
+let run=null,root=null,path=[],page=1,searchMode=false,query="",lastCreateMs=0;
 
 const $=id=>document.getElementById(id);
-function showStatus(el,msg,ok=true){el.textContent=msg;el.className="status "+(ok?"ok":"err")}
-function emailFor(account){const v=account.trim();return v.includes("@")?v.toLowerCase():v+"@hawkvision.local"}
-function pct(arr,p){if(!arr.length)return 0;const a=[...arr].sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor((a.length-1)*p))]}
-function verdict(ms){return ms<=300?["通過","pass"]:ms<=800?["注意","warn"]:["需優化","fail"]}
+const roleLabel={shareholder:"股東",master_agent:"總代理",agent:"代理",sub_agent:"子代理",member:"會員"};
+function emailFor(v){v=v.trim();return v.includes("@")?v.toLowerCase():v+"@hawkvision.local"}
+function show(el,msg,ok=true){el.textContent=msg;el.className="status "+(ok?"ok":"err")}
+function hide(el){el.classList.add("hidden")}function unhide(el){el.classList.remove("hidden")}
 async function rpc(name,args={}){const {data,error}=await sb.rpc(name,args);if(error)throw error;return data}
-async function timed(fn){const a=performance.now();const value=await fn();return {ms:performance.now()-a,value}}
-async function repeats(n,fn){const out=[];for(let i=0;i<n;i++){const r=await timed(fn);out.push(r.ms)}return out}
-function addResult(name,arr){
-  const p50=pct(arr,.50),p95=pct(arr,.95),max=Math.max(...arr),[text,cls]=verdict(p95);
-  $("resultBody").insertAdjacentHTML("beforeend",`<tr><td>${name}</td><td>${p50.toFixed(0)} ms</td><td>${p95.toFixed(0)} ms</td><td>${max.toFixed(0)} ms</td><td class="${cls}">${text}</td></tr>`);
+async function timed(fn){const a=performance.now();const value=await fn();return {value,ms:performance.now()-a}}
+function pct(arr,p){const a=[...arr].sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.floor((a.length-1)*p))]||0}
+function verdict(ms){return ms<=300?["通過","pass"]:ms<=800?["注意","warn"]:["需優化","fail"]}
+function addBench(name,arr){
+  const p50=pct(arr,.5),p95=pct(arr,.95),max=Math.max(...arr),[t,c]=verdict(p95);
+  $("benchBody").insertAdjacentHTML("beforeend",`<tr><td>${name}</td><td>${p50.toFixed(0)} ms</td><td>${p95.toFixed(0)} ms</td><td>${max.toFixed(0)} ms</td><td class="${c}">${t}</td></tr>`);
 }
+async function repeats(n,fn){const a=[];for(let i=0;i<n;i++){a.push((await timed(fn)).ms)}return a}
 
 $("loginBtn").onclick=async()=>{
   try{
     const {data,error}=await sb.auth.signInWithPassword({email:emailFor($("account").value),password:$("password").value});
     if(error)throw error;
     const owner=await rpc("hv_is_platform_owner",{p_user_id:data.user.id});
-    if(owner!==true){await sb.auth.signOut();throw new Error("只有最高管理員可以使用壓力測試工具")}
-    $("loginCard").style.display="none";$("toolCard").style.display="block";
-  }catch(e){showStatus($("loginStatus"),e.message||String(e),false)}
+    if(owner!==true){await sb.auth.signOut();throw new Error("只有最高管理員可以使用壓力測試")}
+    hide($("loginCard"));unhide($("toolCard"));unhide($("logoutBtn"));
+  }catch(e){show($("loginStatus"),e.message||String(e),false)}
 };
 
-$("createRunBtn").onclick=async()=>{
+$("logoutBtn").onclick=async()=>{await sb.auth.signOut();location.reload()};
+
+$("createBtn").onclick=async()=>{
   try{
-    showStatus($("toolStatus"),"正在建立壓力測試資料，請勿關閉頁面…",true);
+    show($("toolStatus"),"正在建立測試資料，請勿關閉頁面…");
     const scale=Number($("scale").value);
     const r=await timed(()=>rpc("hv_stress_create_run_v1",{p_scale:scale}));
-    currentRun=r.value;
-    $("resultCard").style.display="block";
-    $("nodeCount").textContent=currentRun.node_count.toLocaleString();
-    $("auditCount").textContent=currentRun.audit_count.toLocaleString();
+    run=r.value;lastCreateMs=r.ms;
+    root=await rpc("hv_stress_root_v1",{p_run_id:run.run_id});
+    path=[root];page=1;searchMode=false;query="";
+    $("searchInput").value="";
+    $("nodeCount").textContent=Number(run.node_count).toLocaleString();
+    $("auditCount").textContent=Number(run.audit_count).toLocaleString();
     $("createMs").textContent=Math.round(r.ms)+" ms";
-    $("runInfo").textContent=`Run ID：${currentRun.run_id}｜Level：${currentRun.scale}`;
-    showStatus($("toolStatus"),`建立完成：${currentRun.node_count.toLocaleString()} nodes / ${currentRun.audit_count.toLocaleString()} logs`,true);
-  }catch(e){showStatus($("toolStatus"),e.message||String(e),false)}
+    const tree=await rpc("hv_stress_tree_stats_v1",{p_run_id:run.run_id});
+    $("treeDepth").textContent=tree.max_depth;
+    ["summaryCard","mockCard","benchCard","auditCard"].forEach(id=>unhide($(id)));
+    await loadList();
+    show($("toolStatus"),`建立完成：${Number(run.node_count).toLocaleString()} 個假帳號節點`);
+  }catch(e){show($("toolStatus"),e.message||String(e),false)}
 };
 
-$("runBenchBtn").onclick=async()=>{
-  if(!currentRun){showStatus($("toolStatus"),"請先建立測試資料",false);return}
+async function loadList(){
+  if(!run)return;
+  const size=Number($("pageSize").value);
+  let r;
+  if(searchMode){
+    r=await timed(()=>rpc("hv_stress_search_v2",{p_run_id:run.run_id,p_query:query,p_page:page,p_page_size:size}));
+    $("contextTitle").textContent=`搜尋：${query}`;
+  }else{
+    const ctx=path.at(-1);
+    r=await timed(()=>rpc("hv_stress_list_children_v2",{p_run_id:run.run_id,p_parent_id:ctx.id,p_page:page,p_page_size:size}));
+    $("contextTitle").textContent=`${ctx.display_name}｜${roleLabel[ctx.role_key]||ctx.role_key}`;
+  }
+  $("queryMs").textContent=`本次載入 ${r.ms.toFixed(0)} ms｜Server ${r.value.server_ms||"—"} ms`;
+  renderBreadcrumb();
+  renderRows(r.value.rows||[]);
+  renderPager(r.value.page||1,r.value.total_pages||1);
+  $("countText").textContent=`共 ${Number(r.value.total||0).toLocaleString()} 筆`;
+}
+
+function renderBreadcrumb(){
+  const b=$("breadcrumb");
+  if(searchMode){b.innerHTML='<button id="backTreeBtn">← 回到階層樹</button>';$("backTreeBtn").onclick=()=>{searchMode=false;page=1;loadList()};return}
+  b.innerHTML=path.map((x,i)=>`<button data-i="${i}">${x.display_name}</button>${i<path.length-1?"<span>›</span>":""}`).join("");
+  b.querySelectorAll("button[data-i]").forEach(btn=>btn.onclick=()=>{path=path.slice(0,Number(btn.dataset.i)+1);page=1;loadList()});
+}
+
+function renderRows(rows){
+  const box=$("childList");
+  if(!rows.length){box.innerHTML='<div class="child-row muted">目前沒有資料</div>';return}
+  box.innerHTML=rows.map(r=>`
+    <div class="child-row">
+      <div class="child-head">
+        <div>
+          <div class="child-title">${r.display_name}
+            <span class="badge ${r.role_key==="member"?"member":r.role_key==="sub_agent"?"sub":""}">${roleLabel[r.role_key]||r.role_key}</span>
+          </div>
+          <div class="child-account">${r.account}${r.child_count!==undefined?`｜直屬下屬 ${r.child_count}`:""}</div>
+        </div>
+        <div class="actions">
+          ${r.has_children?`<button class="soft enter" data-id="${r.id}">查看下層</button>`:""}
+        </div>
+      </div>
+    </div>`).join("");
+  box.querySelectorAll(".enter").forEach(btn=>btn.onclick=()=>{
+    const row=rows.find(x=>x.id===btn.dataset.id);
+    if(row){path.push(row);page=1;searchMode=false;loadList()}
+  });
+}
+
+function renderPager(p,total){
+  const box=$("pager");
+  box.innerHTML=`
+    <button ${p<=1?"disabled":""} data-p="1">第一頁</button>
+    <button ${p<=1?"disabled":""} data-p="${p-1}">上一頁</button>
+    <span class="muted">第 ${p} / ${total} 頁</span>
+    <button ${p>=total?"disabled":""} data-p="${p+1}">下一頁</button>
+    <button ${p>=total?"disabled":""} data-p="${total}">最後一頁</button>`;
+  box.querySelectorAll("button[data-p]").forEach(btn=>btn.onclick=()=>{page=Number(btn.dataset.p);loadList()});
+}
+
+$("searchBtn").onclick=()=>{query=$("searchInput").value.trim();if(!query)return;searchMode=true;page=1;loadList()};
+$("clearSearchBtn").onclick=()=>{$("searchInput").value="";query="";searchMode=false;page=1;loadList()};
+$("pageSize").onchange=()=>{page=1;loadList()};
+
+$("benchBtn").onclick=async()=>{
+  if(!run)return;
   try{
-    showStatus($("toolStatus"),"效能測試執行中…",true);
-    $("resultBody").innerHTML="";
-    const n=Number($("repeat").value);
-    const runId=currentRun.run_id;
+    $("benchBody").innerHTML="";
+    const n=Number($("repeat").value),runId=run.run_id;
+    const direct=await repeats(n,()=>rpc("hv_stress_list_children_v2",{p_run_id:runId,p_parent_id:root.id,p_page:1,p_page_size:100}));
+    addBench("直屬下屬清單",direct);
+    const search=await repeats(n,()=>rpc("hv_stress_search_v2",{p_run_id:runId,p_query:"測試",p_page:1,p_page_size:20}));
+    addBench("名稱/帳號搜尋",search);
+    const tree=await repeats(n,()=>rpc("hv_stress_tree_stats_v1",{p_run_id:runId}));
+    addBench("整棵樹遞迴統計",tree);
+    const first=await repeats(n,()=>rpc("hv_stress_audit_page_v1",{p_run_id:runId,p_page:1,p_page_size:20}));
+    addBench("Audit 第一頁",first);
+    const last=Math.max(1,Math.ceil(Number(run.audit_count||0)/20));
+    const lastTimes=await repeats(n,()=>rpc("hv_stress_audit_page_v1",{p_run_id:runId,p_page:last,p_page_size:20}));
+    addBench("Audit 最後一頁",lastTimes);
+  }catch(e){show($("toolStatus"),e.message||String(e),false)}
+};
 
-    const tree=await timed(()=>rpc("hv_stress_tree_stats_v1",{p_run_id:runId}));
-    $("treeDepth").textContent=tree.value.max_depth;
+$("seedAuditBtn").onclick=async()=>{
+  if(!run)return;
+  try{
+    const logs=Number($("logsPerNode").value);
+    if(logs===250&&!confirm(`這會建立約 ${Number(run.node_count)*250} 筆測試 Audit，可能需要較久時間。確定繼續？`))return;
+    show($("auditStatus"),"正在重建測試 Audit…");
+    const r=await timed(()=>rpc("hv_stress_seed_audit_pressure_v1",{p_run_id:run.run_id,p_logs_per_node:logs}));
+    run.audit_count=r.value.audit_count;
+    $("auditCount").textContent=Number(run.audit_count).toLocaleString();
+    show($("auditStatus"),`完成：${Number(run.audit_count).toLocaleString()} 筆 Audit｜耗時 ${r.ms.toFixed(0)} ms`);
+  }catch(e){show($("auditStatus"),e.message||String(e),false)}
+};
 
-    // root children
-    const rootResp=await rpc("hv_stress_list_children_v1",{p_run_id:runId,p_parent_id:null,p_limit:10,p_offset:0});
-    const rootId=rootResp.rows?.[0]?.id;
-    const direct=await repeats(n,()=>rpc("hv_stress_list_children_v1",{p_run_id:runId,p_parent_id:rootId,p_limit:100,p_offset:0}));
-    addResult("直屬下屬清單",direct);
-
-    const search=await repeats(n,()=>rpc("hv_stress_search_v1",{p_run_id:runId,p_query:"測試",p_limit:20}));
-    addResult("名稱/帳號搜尋",search);
-
-    const treeTimes=await repeats(n,()=>rpc("hv_stress_tree_stats_v1",{p_run_id:runId}));
-    addResult("整棵樹遞迴統計",treeTimes);
-
-    const auditFirst=await repeats(n,()=>rpc("hv_stress_audit_page_v1",{p_run_id:runId,p_page:1,p_page_size:20}));
-    addResult("Audit 第一頁 20 筆",auditFirst);
-
-    const lastPage=Math.max(1,Math.ceil(currentRun.audit_count/20));
-    const auditLast=await repeats(n,()=>rpc("hv_stress_audit_page_v1",{p_run_id:runId,p_page:lastPage,p_page_size:20}));
-    addResult("Audit 最後一頁 20 筆",auditLast);
-
-    showStatus($("toolStatus"),"效能測試完成",true);
-  }catch(e){showStatus($("toolStatus"),e.message||String(e),false)}
+$("previewRetentionBtn").onclick=async()=>{
+  if(!run)return;
+  try{
+    const r=await rpc("hv_stress_audit_retention_preview_v1",{p_run_id:run.run_id});
+    show($("auditStatus"),
+      `目前 ${Number(r.total_before).toLocaleString()} 筆；套用「30天 + 每帳號最多200筆」後保留 ${Number(r.keep_after_rule).toLocaleString()} 筆，可刪 ${Number(r.would_delete).toLocaleString()} 筆（${r.delete_percent}%）`);
+  }catch(e){show($("auditStatus"),e.message||String(e),false)}
 };
 
 $("cleanupBtn").onclick=async()=>{
-  if(!currentRun){showStatus($("toolStatus"),"目前沒有可刪除的測試資料",false);return}
-  if(!confirm(`確定刪除 Level ${currentRun.scale} 的全部壓力測試資料？`))return;
+  if(!run){show($("toolStatus"),"目前沒有建立測試資料",false);return}
+  if(!confirm(`確定刪除這次 Level ${run.scale} 的全部假帳號與測試 Audit？`))return;
   try{
-    await rpc("hv_stress_cleanup_run_v1",{p_run_id:currentRun.run_id});
-    showStatus($("toolStatus"),"壓力測試資料已全部刪除",true);
-    currentRun=null;$("resultCard").style.display="none";
-  }catch(e){showStatus($("toolStatus"),e.message||String(e),false)}
+    await rpc("hv_stress_cleanup_run_v1",{p_run_id:run.run_id});
+    run=null;root=null;path=[];
+    ["summaryCard","mockCard","benchCard","auditCard"].forEach(id=>hide($(id)));
+    show($("toolStatus"),"本次壓力測試資料已全部刪除");
+  }catch(e){show($("toolStatus"),e.message||String(e),false)}
 };
 </script>
 </body>
