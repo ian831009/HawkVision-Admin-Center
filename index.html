@@ -285,11 +285,81 @@ pre,code,.audit-detail{
 }
 </style>
 
+
+<style id="hv-mobile-final-v209">
+html,body{
+  width:100% !important;
+  max-width:100% !important;
+  overflow-x:hidden !important;
+}
+body{
+  position:relative;
+}
+.search-wrap{
+  display:flex;
+  gap:8px;
+  flex:1 1 auto;
+  min-width:0;
+  max-width:100%;
+}
+.search-wrap input{
+  min-width:0 !important;
+  width:100% !important;
+  max-width:none !important;
+}
+#dashboard,main,header,.section,.toolbar,.toolbar-right,.child-list,.child-row,
+.child-head,.account-manager,.subpanel-host,.subpanel,.manager-menu,.danger-zone,
+.selfPanel,.audit-list,.audit-item,.audit-head,.topbar,.top-user,.top-actions{
+  min-width:0 !important;
+  max-width:100% !important;
+}
+@media(max-width:700px){
+  main{
+    width:100% !important;
+    max-width:100% !important;
+    overflow-x:hidden !important;
+  }
+  .section,.child-row,.account-manager,.subpanel{
+    width:100% !important;
+    max-width:100% !important;
+  }
+  .toolbar{
+    width:100% !important;
+    grid-template-columns:minmax(0,1fr) !important;
+  }
+  .search-wrap{
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto !important;
+    width:100% !important;
+    min-width:0 !important;
+  }
+  .child-head{
+    grid-template-columns:minmax(0,1fr) minmax(0,auto) !important;
+  }
+  .row-actions{
+    min-width:0 !important;
+    max-width:46% !important;
+  }
+  .row-actions button{
+    min-width:0 !important;
+    max-width:100% !important;
+  }
+  .manager-menu{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    width:100% !important;
+  }
+  .manager-menu>*{
+    min-width:0 !important;
+    max-width:100% !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.0.8</div>
+  <div class="version">Admin Center v2.0.9</div>
 </header>
 
 <main>
@@ -345,7 +415,7 @@ pre,code,.audit-detail{
 
   <div class="section">
     <div class="toolbar">
-      <div style="display:flex;gap:8px;flex:1;min-width:240px">
+      <div class="search-wrap">
         <input id="accountSearch" type="search" placeholder="搜尋名稱或帳號" />
         <button id="accountSearchBtn" class="secondary" type="button">搜尋</button>
       </div>
@@ -743,7 +813,7 @@ async function renderManager(manager,child,row){
       if(!Number.isInteger(amount)||amount<=0){localStatus(host,"額度必須是大於0的整數");return}
       try{
         await api(action==="allocate"?"/allocate-quota":"/reclaim-quota",{owner_user_id:child.parent_id,target_user_id:child.user_id,amount,reason});
-        notify(action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功","success");
+        localStatus(host,action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功","success");
         await refreshChildDetailInPlace(manager,child,row);
       }catch(e){localStatus(host,translateError(e.message))}
     };
@@ -816,9 +886,9 @@ async function renderManager(manager,child,row){
           }
 
           if(changed.length===0){
-            notify("目前權限沒有變更","success");
+            localStatus(host,"目前權限沒有變更","success");
           }else{
-            notify("✓ 權限設定成功","success");
+            localStatus(host,"✓ 權限設定成功","success");
           }
         }catch(e){
           localStatus(host,translateError(e.message));
@@ -898,7 +968,7 @@ async function renderManager(manager,child,row){
         await api("/update-display-name",{target_user_id:child.user_id,display_name:value});
         child.display_name=value;
         updateRowSummary(row,child);
-        notify("✓ 名稱修改成功","success");
+        localStatus(host,"✓ 名稱修改成功","success");
         await refreshChildDetailInPlace(manager,child,row);
       }catch(e){
         // 若 API 後段同步失敗，再讀一次正式 profile 狀態。
@@ -908,7 +978,7 @@ async function renderManager(manager,child,row){
           if(verifyDetail && String(verifyDetail.display_name||"").trim()===value){
             child.display_name=value;
             updateRowSummary(row,child);
-            notify("✓ 名稱修改成功","success");
+            localStatus(host,"✓ 名稱修改成功","success");
             await refreshChildDetailInPlace(manager,child,row);
           }else{
             localStatus(host,translateError(e.message));
@@ -934,7 +1004,7 @@ async function renderManager(manager,child,row){
         await api("/reset-password",{target_user_id:child.user_id,new_password:p1});
         host.querySelector(".p1").value="";
         host.querySelector(".p2").value="";
-        notify("✓ 密碼重設成功；下次登入需重新設定密碼","success");
+        localStatus(host,"✓ 密碼重設成功；下次登入需重新設定密碼","success");
       }catch(e){localStatus(host,translateError(e.message))}
     });
   });
@@ -946,7 +1016,7 @@ async function renderManager(manager,child,row){
       await api("/set-account-enabled",{target_user_id:child.user_id,enabled:enabling});
       child.is_enabled=enabling;
       updateRowSummary(row,child);
-      notify(enabling?"✓ 帳號及所有下屬已啟用":"✓ 帳號及所有下屬已停用","success");
+      localStatus(host,enabling?"✓ 帳號及所有下屬已啟用":"✓ 帳號及所有下屬已停用","success");
       await refreshChildDetailInPlace(manager,child,row);
     }catch(e){localStatus(host,translateError(e.message))}
   });
@@ -960,9 +1030,11 @@ async function renderManager(manager,child,row){
     if(!confirm(message))return;
     try{
       const result=await api("/delete-account",{target_user_id:child.user_id});
-      currentChildren=currentChildren.filter(x=>String(x.user_id)!==String(child.user_id));
-      notify("✓ "+(result.message||"帳號刪除成功"),"success");
-      renderChildren();
+      localStatus(host,"✓ "+(result.message||"帳號刪除成功"),"success");
+      setTimeout(()=>{
+        currentChildren=currentChildren.filter(x=>String(x.user_id)!==String(child.user_id));
+        renderChildren();
+      },3000);
     }catch(e){localStatus(host,translateError(e.message))}
   });
 }
@@ -996,8 +1068,9 @@ async function createAccount(){
   try{
     if(!name)throw new Error("請輸入名稱");validateAccountLike(account,"帳號");validateAccountLike(password,"密碼");if(!role)throw new Error("請選擇商業層級");if(!Number.isInteger(quota)||quota<0)throw new Error("初始額度必須是0以上整數");
     await api("/create-account",{parent_user_id:ctx.user_id,display_name:name,account,password,business_role:role,initial_quota:quota});
+    const createStatus=document.getElementById("createStatus");
+    setStatus(createStatus,role==="member"?"✓ 會員帳號建立成功":role==="co_admin"?"✓ 共同管理員建立成功":`✓ 帳號建立成功${quota>0?`，已分配額度 ${quota}`:""}`,"success",true);
     resetCreateForm();
-    notify(role==="member"?"✓ 會員帳號建立成功":role==="co_admin"?"✓ 共同管理員建立成功":`✓ 帳號建立成功${quota>0?`，已分配額度 ${quota}`:""}`,"success");
     await refreshChildrenDataOnly();
   }catch(e){setStatus(status,"建立失敗："+translateError(e.message),"error",true)}
 }
@@ -1117,20 +1190,15 @@ async function openAuditLogs(){
     const rows=Array.isArray(data)?data:[];
     panel.innerHTML=`<div class="manager-title"><h3 style="margin:0">我的異動日誌</h3><button class="secondary audit-close" type="button">關閉</button></div>
       <div class="hint" style="margin:8px 0 12px">只顯示你本人實際操作產生的異動。</div>
-      <button class="audit-floating-home" type="button">回到最上層</button>
+      <button class="audit-floating-home" type="button">回到最上方</button>
       <div class="audit-list">${rows.map(item=>`<div class="audit-item">
         <div class="audit-head"><div><div class="audit-type">${escapeHtml(AUDIT_LABELS[item.action_type]||item.action_type)}</div><div class="audit-target">${escapeHtml(item.target_display_name||item.target_account||"—")}</div></div><div class="audit-time">${escapeHtml(formatAuditTime(item.created_at))}</div></div>
         ${item.has_detail?`<button class="secondary audit-detail-btn" type="button" style="margin-top:8px">查看詳細</button><div class="audit-detail" style="display:none">${escapeHtml(auditDetailText(item))}</div>`:""}
       </div>`).join("")||'<div class="empty">目前沒有異動紀錄</div>'}</div>`;
     panel.querySelector(".audit-close").addEventListener("click",()=>{panel.style.display="none";panel.innerHTML=""});
-    panel.querySelector(".audit-floating-home").addEventListener("click",async()=>{
-      panel.style.display="none";
-      panel.innerHTML="";
-      clearAccountSearch();
-      closeAllPanels();
-      if(contextStack.length>1)contextStack=contextStack.slice(0,1);
-      await loadContext(false);
-      window.scrollTo({top:0,behavior:"smooth"});
+    panel.querySelector(".audit-floating-home").addEventListener("click",()=>{
+      const top=Math.max(panel.getBoundingClientRect().top+window.scrollY-12,0);
+      window.scrollTo({top,behavior:"smooth"});
     });
     panel.querySelectorAll(".audit-detail-btn").forEach(btn=>btn.addEventListener("click",()=>{
       const detail=btn.nextElementSibling;
@@ -1162,14 +1230,14 @@ function openSelfName(){
       await api("/update-display-name",{target_user_id:currentUser.id,display_name:value});
       currentSelf.display_name=value;
       document.getElementById("currentName").textContent=value;
-      notify("✓ 名稱修改成功","success");
+      localStatus(panel,"✓ 名稱修改成功","success");
     }catch(err){
       try{
         const {data:fresh}=await supabaseClient.rpc("hv_admin_current_account");
         if(fresh && String(fresh.display_name||"").trim()===value){
           currentSelf.display_name=value;
           document.getElementById("currentName").textContent=value;
-          notify("✓ 名稱修改成功","success");
+          localStatus(panel,"✓ 名稱修改成功","success");
         }else{
           localStatus(panel,translateError(err.message));
         }
@@ -1194,7 +1262,7 @@ function openSelfPassword(){
       validateAccountLike(p1,"密碼");
       if(p1!==p2)throw new Error("兩次輸入的密碼不一致");
       await api("/reset-password",{target_user_id:currentUser.id,new_password:p1});
-      notify("✓ 密碼修改成功，3 秒後請重新登入","success");
+      localStatus(panel,"✓ 密碼修改成功，3 秒後請重新登入","success");
       setTimeout(async()=>{await supabaseClient.auth.signOut();showOnly("login")},3000);
     }catch(e){localStatus(panel,"修改失敗："+translateError(e.message))}
   });
