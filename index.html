@@ -432,7 +432,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.1.1</div>
+  <div class="version">Admin Center v2.1.2</div>
 </header>
 
 <main>
@@ -724,7 +724,7 @@ function startSessionWatch(){
 }
 
 async function selfDetail(){
-  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:currentUser.id});
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:currentUser.id});
   if(error)throw new Error(translateError(error.message));
   return data;
 }
@@ -817,7 +817,7 @@ function updateRowSummary(row,child){
   if(account)account.textContent=`帳號：${child.account||"—"}`;
 }
 async function refreshChildDetailInPlace(manager,child,row){
-  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:child.user_id});
+  const {data,error}=await supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:child.user_id});
   if(error)throw error;
   Object.assign(child,data||{});
   updateRowSummary(row,child);
@@ -833,7 +833,7 @@ async function refreshChildrenDataOnly(){
 
 async function renderManager(manager,child,row){
   const [{data,error},{data:takeoverPlan,error:takeoverError},{data:permissionPolicy,error:permissionPolicyError}]=await Promise.all([
-    supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:child.user_id}),
+    supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:child.user_id}),
     supabaseClient.rpc("hv_takeover_delete_plan_v4",{p_actor_user_id:currentUser.id,p_target_user_id:child.user_id}),
     supabaseClient.rpc("hv_admin_product_access_v2",{p_target_user_id:child.user_id})
   ]);
@@ -843,12 +843,13 @@ async function renderManager(manager,child,row){
   detail.permission_policy=permissionPolicyError?[]:(Array.isArray(permissionPolicy)?permissionPolicy:[]);
   const showPermissionMenu=detail.permission_policy.length>0;
   manager.innerHTML=`<div class="manager-title"><strong>${escapeHtml(detail.display_name||"未命名")}｜${escapeHtml(detail.role_name||ROLE_LABEL[detail.business_role]||"")}</strong><button class="secondary close-manager" type="button">收起</button></div>
-    ${readonly?'<div class="readonly-note">目前為跨層查看模式：額度、權限、使用時間只能查看。</div>':""}
+    ${readonly?`<div class="readonly-note">目前為跨層查看模式：額度、權限、使用時間只能查看。${detail.identity_access_mode==="creator_before_first_login"?" 此帳號由你建立且尚未完成首次登入，因此你暫時仍可修改名稱與密碼。":""}</div>`:""}
     <div class="manager-menu">
       ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
       ${showPermissionMenu?'<button class="soft-violet permission-menu" type="button">權限管理</button>':""}
       <button class="soft-amber time-menu" type="button">使用時間管理</button>
-      ${readonly?"":`${detail.can_rename?'<button class="soft-cyan name-menu" type="button">修改名稱</button>':""}<button class="soft password-menu" type="button">修改密碼</button>`}
+      ${detail.can_rename?'<button class="soft-cyan name-menu" type="button">修改名稱</button>':""}
+      ${detail.can_reset_password?'<button class="soft password-menu" type="button">修改密碼</button>':""}
     </div>
     <div class="subpanel-host"></div>
     ${readonly?"":`<div class="danger-zone"><div class="manager-menu">
@@ -890,7 +891,7 @@ async function renderManager(manager,child,row){
         localStatus(host,action==="allocate"?"✓ 額度分配成功":"✓ 額度收回成功","success");
         try{
           const [{data:fresh},{data:ownerRemainingData}]=await Promise.all([
-            supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:child.user_id}),
+            supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:child.user_id}),
             supabaseClient.rpc("hv_quota_remaining_v3",{p_user_id:child.parent_id})
           ]);
           if(fresh){
@@ -1069,7 +1070,7 @@ async function renderManager(manager,child,row){
         // API 若回報錯誤，才讀正式資料確認是否其實已成功。
         try{
           const {data:verifyDetail,error:verifyError}=await supabaseClient.rpc(
-            "hv_admin_account_detail_v4",
+            "hv_admin_account_detail_v5",
             {p_target_user_id:child.user_id}
           );
           if(!verifyError && verifyDetail && String(verifyDetail.display_name||"").trim()===value){
@@ -1139,7 +1140,7 @@ async function renderManager(manager,child,row){
 async function loadContext(closePanels=true){
   if(closePanels)closeAllPanels();
   let ctx=contextStack.at(-1);
-  const {data:detail,error:detailError}=await supabaseClient.rpc("hv_admin_account_detail_v4",{p_target_user_id:ctx.user_id});
+  const {data:detail,error:detailError}=await supabaseClient.rpc("hv_admin_account_detail_v5",{p_target_user_id:ctx.user_id});
   if(!detailError&&detail){ctx={...ctx,...detail};contextStack[contextStack.length-1]=ctx}
   renderContextHeader();
   document.getElementById("childList").innerHTML='<div class="empty">載入中…</div>';
