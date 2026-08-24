@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.13</div>
+  <div class="version">Admin Center v2.3.14</div>
 </header>
 
 <main>
@@ -757,17 +757,23 @@ function translateError(message){
   if(/[一-鿿]/.test(raw))return raw;
   return "系統發生錯誤，請稍後再試";
 }
-function setStatus(el,msg,type="success",auto=true){
+function setStatus(el,msg,type="success",auto=true,autoMs=3000){
   if(!el)return;
   clearTimeout(el._statusTimer);
   el.textContent=type==="error"?translateError(msg):String(msg||"");
   el.className=`status ${type}`;
   el.style.display="block";
+
   if(auto){
+    const ms=Math.max(250,Number(autoMs)||3000);
+    el.dataset.statusExpireAt=String(Date.now()+ms);
     el._statusTimer=setTimeout(()=>{
       el.style.display="none";
       el.textContent="";
-    },3000);
+      delete el.dataset.statusExpireAt;
+    },ms);
+  }else{
+    delete el.dataset.statusExpireAt;
   }
 }
 function notify(msg,type="success"){
@@ -1267,12 +1273,49 @@ function updateRowSummary(row,child){
 function scheduleManagerRefresh(manager,child,row,reopenSelector){
   clearTimeout(manager?._autoRefreshTimer);
   if(!manager)return;
+
   manager._autoRefreshTimer=setTimeout(async()=>{
     if(!manager.isConnected)return;
+
+    const scrollY=window.scrollY;
+    const hostBefore=manager.querySelector(".subpanel-host");
+    const localBefore=hostBefore?.querySelector(".local-status");
+    let statusState=null;
+
+    if(localBefore && localBefore.style.display!=="none" && String(localBefore.textContent||"").trim()){
+      const expireAt=Number(localBefore.dataset.statusExpireAt||0);
+      statusState={
+        text:String(localBefore.textContent||""),
+        type:localBefore.classList.contains("error")?"error":"success",
+        remainingMs:expireAt>0?Math.max(250,expireAt-Date.now()):1000
+      };
+    }
+
     try{
       await renderManager(manager,child,row);
+
       const btn=reopenSelector?manager.querySelector(reopenSelector):null;
       if(btn)btn.click();
+
+      if(statusState){
+        await new Promise(resolve=>setTimeout(resolve,0));
+        const local=manager.querySelector(".subpanel-host .local-status");
+        if(local){
+          setStatus(
+            local,
+            statusState.text,
+            statusState.type,
+            true,
+            statusState.remainingMs
+          );
+        }
+      }
+
+      requestAnimationFrame(()=>{
+        requestAnimationFrame(()=>{
+          window.scrollTo({top:scrollY,left:0,behavior:"auto"});
+        });
+      });
     }catch(_){}
   },3050);
 }
@@ -1770,28 +1813,109 @@ function managementSnapshot(ctx,children){
   });
 }
 
+
+function captureVisibleManagerUiState(){
+  const manager=document.querySelector(".account-manager");
+  if(!manager)return null;
+
+  const host=manager.querySelector(".subpanel-host");
+  const local=host?.querySelector(".local-status");
+
+  let reopenSelector=null;
+  if(host){
+    if(host.querySelector(".quota-amount,.quota-target-remaining"))reopenSelector=".quota-menu";
+    else if(host.querySelector(".product-switch,.platform-quota-switch"))reopenSelector=".permission-menu";
+    else if(host.querySelector(".contract-start-date,.contract-end-date"))reopenSelector=".contract-menu";
+    else if(host.querySelector(".grant-hours,.reclaim-hours-btn"))reopenSelector=".hours-menu";
+    else if(host.querySelector(".name-input"))reopenSelector=".name-menu";
+    else if(host.querySelector(".p1,.p2"))reopenSelector=".password-menu";
+    else if(host.querySelector('input[name="enabledScope"]'))reopenSelector=".toggle-menu";
+  }
+
+  let statusState=null;
+  if(local && local.style.display!=="none" && String(local.textContent||"").trim()){
+    const expireAt=Number(local.dataset.statusExpireAt||0);
+    const remainingMs=expireAt>0 ? Math.max(250,expireAt-Date.now()) : 3000;
+    statusState={
+      text:String(local.textContent||""),
+      type:local.classList.contains("error")?"error":"success",
+      remainingMs
+    };
+  }
+
+  return {
+    userId:
+      manager.closest(".child-row")?.dataset?.id ||
+      manager.dataset?.userId ||
+      null,
+    reopenSelector,
+    statusState,
+    scrollY:window.scrollY,
+    activeElementClass:
+      document.activeElement?.className && typeof document.activeElement.className==="string"
+        ? document.activeElement.className
+        : ""
+  };
+}
+
+async function restoreVisibleManagerUiState(state){
+  if(!state?.userId)return;
+
+  const child=currentChildren.find(
+    x=>String(x.user_id)===String(state.userId)
+  );
+  const row=child
+    ? document.querySelector(
+        `.child-row[data-id="${CSS.escape(String(state.userId))}"]`
+      )
+    : null;
+
+  if(!child || !row)return;
+
+  const manager=document.createElement("div");
+  manager.className="account-manager";
+  manager.dataset.userId=String(state.userId);
+  row.appendChild(manager);
+
+  await renderManager(manager,child,row).catch(()=>{});
+
+  if(state.reopenSelector){
+    const reopenBtn=manager.querySelector(state.reopenSelector);
+    if(reopenBtn)reopenBtn.click();
+  }
+
+  if(state.statusState){
+    const host=manager.querySelector(".subpanel-host");
+    if(host){
+      // 等子面板 click handler 完成 innerHTML 後再補回提示。
+      await new Promise(resolve=>setTimeout(resolve,0));
+      const local=host.querySelector(".local-status");
+      if(local){
+        setStatus(
+          local,
+          state.statusState.text,
+          state.statusState.type,
+          true,
+          state.statusState.remainingMs
+        );
+      }
+    }
+  }
+
+  // DOM 重畫會讓瀏覽器自動跳到較上方；完成整個還原後拉回原本位置。
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      window.scrollTo({top:state.scrollY,left:0,behavior:"auto"});
+    });
+  });
+}
+
 async function syncManagementViewNow(force=false){
   if(managementSyncBusy || !currentUser || !dashboard || dashboard.style.display==="none" || !contextStack.length)return;
   managementSyncBusy=true;
   try{
-    // 記住目前是否正打開某帳號的管理面板，
-    // renderChildren() 重畫後再重新開啟，讓權限/額度/名稱等也同步。
-    const existingManager=document.querySelector(".account-manager");
-    const openManagerUid=
-      existingManager?.closest(".child-row")?.dataset?.id ||
-      existingManager?.dataset?.userId ||
-      null;
-
-    const existingHost=existingManager?.querySelector(".subpanel-host");
-    let reopenSelector=null;
-    if(existingHost){
-      if(existingHost.querySelector(".quota-amount,.quota-target-remaining"))reopenSelector=".quota-menu";
-      else if(existingHost.querySelector(".product-switch,.platform-quota-switch"))reopenSelector=".permission-menu";
-      else if(existingHost.querySelector(".contract-start-date,.contract-end-date"))reopenSelector=".contract-menu";
-      else if(existingHost.querySelector(".grant-hours,.reclaim-hours-btn"))reopenSelector=".hours-menu";
-      else if(existingHost.querySelector(".name-input"))reopenSelector=".name-menu";
-      else if(existingHost.querySelector(".p1,.p2"))reopenSelector=".password-menu";
-    }
+    // 保存目前使用者正在看的位置、功能子面板與成功/失敗提示。
+    const visibleUiState=captureVisibleManagerUiState();
 
     // 整條目前導覽路徑都刷新，名稱修改後 breadcrumb 也會同步。
     const refreshedStack=[];
@@ -1834,31 +1958,9 @@ async function syncManagementViewNow(force=false){
     renderContextHeader();
     renderChildren();
 
-    // 如果管理面板原本開著，重畫後重新建立並抓最新詳細資料與產品權限。
-    if(openManagerUid){
-      const child=currentChildren.find(
-        x=>String(x.user_id)===String(openManagerUid)
-      );
-      const row=child
-        ? document.querySelector(
-            `.child-row[data-id="${CSS.escape(String(openManagerUid))}"]`
-          )
-        : null;
-
-      if(child && row){
-        const manager=document.createElement("div");
-        manager.className="account-manager";
-        manager.dataset.userId=String(openManagerUid);
-        row.appendChild(manager);
-        await renderManager(manager,child,row).catch(()=>{});
-
-        // 其他管理者正在看的功能面板也保持打開，
-        // 只把裡面的資料換成最新值，不把人踢回帳號列表。
-        if(reopenSelector){
-          const reopenBtn=manager.querySelector(reopenSelector);
-          if(reopenBtn)reopenBtn.click();
-        }
-      }
+    // 重畫後恢復原本管理面板、子功能、提示與捲動位置。
+    if(visibleUiState){
+      await restoreVisibleManagerUiState(visibleUiState);
     }
   }finally{
     managementSyncBusy=false;
