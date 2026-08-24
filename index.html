@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.8</div>
+  <div class="version">Admin Center v2.3.9</div>
 </header>
 
 <main>
@@ -1684,14 +1684,41 @@ async function syncManagementViewNow(force=false){
   if(managementSyncBusy || !currentUser || !dashboard || dashboard.style.display==="none" || !contextStack.length)return;
   managementSyncBusy=true;
   try{
-    const ctx=contextStack.at(-1);
-    const [{data:detail,error:detailError},{data:children,error:childrenError}]=await Promise.all([
-      supabaseClient.rpc("hv_admin_account_detail_v7",{p_target_user_id:ctx.user_id}),
-      supabaseClient.rpc("hv_admin_list_children_v3",{p_parent_user_id:ctx.user_id})
-    ]);
-    if(detailError||childrenError)return;
+    // v2.3.9：永久刪除同步。
+    // 如果目前正在看的節點已被其他管理員永久刪除，
+    // 自動往上退到最近仍存在且可讀取的節點。
+    let ctx=contextStack.at(-1);
+    let detail=null;
+    let detailError=null;
 
-    const nextCtx=detail?{...ctx,...detail}:ctx;
+    while(contextStack.length){
+      ctx=contextStack.at(-1);
+      const result=await supabaseClient.rpc("hv_admin_account_detail_v7",{p_target_user_id:ctx.user_id});
+      detail=result.data;
+      detailError=result.error;
+
+      if(!detailError && detail)break;
+
+      if(contextStack.length>1){
+        closeAllPanels();
+        contextStack.pop();
+        continue;
+      }
+
+      // 根節點若暫時讀取失敗，不自行登出；下一輪同步再重試。
+      return;
+    }
+
+    const nextCtx={...ctx,...detail};
+
+    // 子列表獨立讀取；永久刪除後只要列表成功回來，
+    // 即使其他 UI 面板仍保存舊資料，也以最新列表為準。
+    const {data:children,error:childrenError}=await supabaseClient.rpc(
+      "hv_admin_list_children_v3",
+      {p_parent_user_id:nextCtx.user_id}
+    );
+    if(childrenError)return;
+
     const nextChildren=Array.isArray(children)?children:[];
     const sig=managementSnapshot(nextCtx,nextChildren);
     if(!force && sig===managementSyncSignature)return;
@@ -1700,12 +1727,11 @@ async function syncManagementViewNow(force=false){
     currentChildren=nextChildren;
     managementSyncSignature=sig;
 
-    // 即時更新目前節點、列表狀態、額度與排序。
     renderContextHeader();
     renderChildren();
 
-    // 若目前有開啟某帳號管理面板，重新抓該帳號詳細資料，
-    // 讓權限/額度/停用等內容也同步，不必 F5。
+    // 若原本開著的管理面板所屬帳號已被永久刪除，
+    // renderChildren 後它自然消失；若帳號仍存在則重新抓詳細資料。
     const openManager=document.querySelector(".account-manager");
     if(openManager){
       const uid=openManager.dataset?.userId;
@@ -1713,6 +1739,8 @@ async function syncManagementViewNow(force=false){
       const row=child?document.querySelector(`.child-row[data-user-id="${CSS.escape(String(uid))}"]`):null;
       if(child && row){
         await renderManager(openManager,child,row).catch(()=>{});
+      }else{
+        openManager.remove();
       }
     }
   }finally{
