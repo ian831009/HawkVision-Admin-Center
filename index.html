@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.5</div>
+  <div class="version">Admin Center v2.3.6</div>
 </header>
 
 <main>
@@ -1869,7 +1869,7 @@ async function openAuditLogs(page=1,options={}){
       </div>
       <button class="audit-floating-home" type="button">回到最上方</button>
       <div class="audit-list">${rows.map(item=>`<div class="audit-item">
-        <div class="audit-head"><div><div class="audit-type">${escapeHtml(auditTypeLabel(item))}</div><div class="audit-target">${escapeHtml(item.target_display_name||item.target_account||"—")}</div></div><div class="audit-time">${escapeHtml(formatAuditTime(item.created_at))}</div></div>
+        <div class="audit-head"><div><div class="audit-type">${escapeHtml(auditTypeLabel(item))}</div><div class="audit-target">${escapeHtml(item.action_type==="ACCOUNT_CREATE" ? ((item.target_display_name||item.new_data?.target_display_name||"—") + ((item.target_account||item.new_data?.target_account) ? `（${item.target_account||item.new_data?.target_account}）` : "")) : (item.target_display_name||item.target_account||"—"))}</div></div><div class="audit-time">${escapeHtml(formatAuditTime(item.created_at))}</div></div>
         ${item.has_detail?`<button class="secondary audit-detail-btn" type="button" style="margin-top:8px">查看詳細</button><div class="audit-detail" style="display:none">${escapeHtml(auditDetailText(item))}</div>`:""}
       </div>`).join("")||'<div class="empty">沒有符合條件的異動紀錄</div>'}</div>
       ${auditPaginationHtml(auditCurrentPage,lastPage,total,"bottom")}`;
