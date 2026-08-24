@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.7</div>
+  <div class="version">Admin Center v2.3.8</div>
 </header>
 
 <main>
@@ -688,6 +688,9 @@ const ACCOUNT_PASSWORD_RE=/^(?=.{6,11}$)(?=.*[a-z])(?=(?:.*\d){5,})[a-z0-9]+$/;
 let currentUser=null,currentSelf=null,currentChildren=[],contextStack=[],createAllowedRoles=[];let appliedSearch="";
 let sessionWatch=null;
 let accessRecoveryWatch=null;
+let managementSyncWatch=null;
+let managementSyncBusy=false;
+let managementSyncSignature="";
 
 const loginSection=document.getElementById("loginSection");
 const accessLockedSection=document.getElementById("accessLockedSection");
@@ -910,6 +913,7 @@ function startAccessRecoveryWatch(){
 }
 
 function handleProductAccessRevoked(){
+  stopManagementSyncWatch();
   if(sessionWatch){
     clearInterval(sessionWatch);
     sessionWatch=null;
@@ -925,6 +929,7 @@ function handleProductAccessRevoked(){
 }
 
 async function handleDisabled(){
+  stopManagementSyncWatch();
   stopAccessRecoveryWatch();
   if(sessionWatch){clearInterval(sessionWatch);sessionWatch=null}
   await supabaseClient.auth.signOut().catch(()=>{});
@@ -1006,6 +1011,16 @@ function isOwnContext(ctx){
 async function allowedRolesFor(parentId){
   const ctx=contextStack.at(-1);
 
+  // 共同管理員只是最高管理員的代理操作者，不擁有自己的商業樹。
+  // 在最高管理員根層建立：新帳號直屬最高管理員。
+  // 進入既有股東/總代理/代理/子代理後建立：新帳號直屬目前所在節點。
+  if(currentSelf?.business_role==="co_admin"){
+    if(ctx?.is_platform_owner===true){
+      return ["shareholder","master_agent","agent","sub_agent","member"];
+    }
+    return localAllowedRolesForContext(ctx);
+  }
+
   // 自己登入自己的層級時，直接依正式角色矩陣顯示，
   // 不再讓新增按鈕因 RPC / schema cache 暫時失敗而消失。
   if(isOwnContext(ctx)){
@@ -1042,6 +1057,13 @@ async function allowedRolesFor(parentId){
 
 async function canActAsParent(parentId){
   const ctx=contextStack.at(-1);
+
+  // 共同管理員可代理最高管理員在其商業樹中建立帳號；
+  // parent 永遠是目前所在節點，而不是共同管理員本人。
+  if(currentSelf?.business_role==="co_admin"){
+    if(ctx?.is_platform_owner===true)return true;
+    return localAllowedRolesForContext(ctx).length>0;
+  }
 
   // 股東 / 總代 / 代理 / 子代理登入自己的管理頁，
   // 一律依本身層級擁有新增功能。
@@ -1631,6 +1653,87 @@ async function renderManager(manager,child,row){
   });
 }
 
+
+function managementSnapshot(ctx,children){
+  const normalized=(Array.isArray(children)?children:[]).map(x=>({
+    user_id:x.user_id,
+    parent_id:x.parent_id,
+    display_name:x.display_name,
+    account:x.account,
+    business_role:x.business_role,
+    is_enabled:x.is_enabled,
+    quota_total:x.quota_total,
+    quota_remaining:x.quota_remaining,
+    can_create_downline:x.can_create_downline,
+    can_use_platform_quota:x.can_use_platform_quota,
+    has_children:x.has_children
+  }));
+  return JSON.stringify({
+    ctx:{
+      user_id:ctx?.user_id,
+      display_name:ctx?.display_name,
+      is_enabled:ctx?.is_enabled,
+      quota_total:ctx?.quota_total,
+      quota_remaining:ctx?.quota_remaining
+    },
+    children:normalized
+  });
+}
+
+async function syncManagementViewNow(force=false){
+  if(managementSyncBusy || !currentUser || !dashboard || dashboard.style.display==="none" || !contextStack.length)return;
+  managementSyncBusy=true;
+  try{
+    const ctx=contextStack.at(-1);
+    const [{data:detail,error:detailError},{data:children,error:childrenError}]=await Promise.all([
+      supabaseClient.rpc("hv_admin_account_detail_v7",{p_target_user_id:ctx.user_id}),
+      supabaseClient.rpc("hv_admin_list_children_v3",{p_parent_user_id:ctx.user_id})
+    ]);
+    if(detailError||childrenError)return;
+
+    const nextCtx=detail?{...ctx,...detail}:ctx;
+    const nextChildren=Array.isArray(children)?children:[];
+    const sig=managementSnapshot(nextCtx,nextChildren);
+    if(!force && sig===managementSyncSignature)return;
+
+    contextStack[contextStack.length-1]=nextCtx;
+    currentChildren=nextChildren;
+    managementSyncSignature=sig;
+
+    // 即時更新目前節點、列表狀態、額度與排序。
+    renderContextHeader();
+    renderChildren();
+
+    // 若目前有開啟某帳號管理面板，重新抓該帳號詳細資料，
+    // 讓權限/額度/停用等內容也同步，不必 F5。
+    const openManager=document.querySelector(".account-manager");
+    if(openManager){
+      const uid=openManager.dataset?.userId;
+      const child=currentChildren.find(x=>String(x.user_id)===String(uid));
+      const row=child?document.querySelector(`.child-row[data-user-id="${CSS.escape(String(uid))}"]`):null;
+      if(child && row){
+        await renderManager(openManager,child,row).catch(()=>{});
+      }
+    }
+  }finally{
+    managementSyncBusy=false;
+  }
+}
+
+function stopManagementSyncWatch(){
+  if(managementSyncWatch){
+    clearInterval(managementSyncWatch);
+    managementSyncWatch=null;
+  }
+}
+
+function startManagementSyncWatch(){
+  stopManagementSyncWatch();
+  managementSyncWatch=setInterval(()=>{
+    syncManagementViewNow(false).catch(()=>{});
+  },1500);
+}
+
 async function loadContext(closePanels=true){
   if(closePanels)closeAllPanels();
   let ctx=contextStack.at(-1);
@@ -1674,6 +1777,7 @@ async function loadContext(closePanels=true){
   }
 
   populateRoleSelect();renderChildren();
+  managementSyncSignature=managementSnapshot(ctx,currentChildren);
 }
 function populateRoleSelect(){
   const sel=document.getElementById("newRole");
@@ -1786,6 +1890,7 @@ async function createAccount(){
     resetCreateForm();
     setStatus(status,`✓ ${result.message||"帳號建立成功"}`,"success",true);
     await refreshChildrenDataOnly();
+    managementSyncSignature=managementSnapshot(contextStack.at(-1),currentChildren);
   }catch(e){
     setStatus(status,"建立失敗："+(e.message||e),"error",true);
   }
@@ -1822,7 +1927,7 @@ async function loadDashboard(){
   document.getElementById("currentRole").textContent="｜"+(currentSelf.role_name||ROLE_LABEL[currentSelf.business_role]||"");
   document.getElementById("currentStatus").textContent=currentSelf.is_enabled?"啟用中":"🚫 已停用";
   document.getElementById("myNameBtn").style.display=currentSelf.is_platform_owner?"inline-flex":"none";
-  const root=await rootContext();contextStack=[root];showOnly("dashboard");startSessionWatch();await loadContext();
+  const root=await rootContext();contextStack=[root];showOnly("dashboard");startSessionWatch();await loadContext();startManagementSyncWatch();
 }
 async function login(){
   const account=loginEmail(document.getElementById("loginAccount").value),password=document.getElementById("loginPassword").value,status=document.getElementById("loginStatus");status.style.display="none";
@@ -2125,6 +2230,7 @@ document.getElementById("loginBtn").addEventListener("click",login);
 document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
 document.getElementById("claimBtn").addEventListener("click",claimPassword);
 document.getElementById("logoutBtn").addEventListener("click",async()=>{
+  stopManagementSyncWatch();
   if(sessionWatch)clearInterval(sessionWatch);
   try{await supabaseClient.auth.signOut({scope:"global"})}catch{}
   try{await supabaseClient.auth.signOut({scope:"local"})}catch{}
