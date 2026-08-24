@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.12</div>
+  <div class="version">Admin Center v2.3.13</div>
 </header>
 
 <main>
@@ -695,6 +695,7 @@ let deletionWatch=null;
 const deletedAccountTombstones=new Set();
 let managementBroadcastChannel=null;
 let managementBroadcastReady=false;
+const managementBroadcastSourceId=(crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`);
 
 const loginSection=document.getElementById("loginSection");
 const accessLockedSection=document.getElementById("accessLockedSection");
@@ -840,10 +841,13 @@ function startManagementBroadcast(){
       .on(
         "broadcast",
         {event:"management-change"},
-        async(payload)=>{
-          // 自己送出的事件也可能收到，重抓一次沒有副作用；
-          // 所有登入中的最高管理員、共同管理員、股東及以下管理層
-          // 都使用同一個同步事件。
+        async(message)=>{
+          const payload=message?.payload||{};
+          // 本頁自己的操作已由原本「原地更新」邏輯處理，
+          // 不再因廣播重畫整個列表，避免額度/名稱/權限面板被關掉。
+          if(payload.source_id===managementBroadcastSourceId)return;
+
+          // 其他頁籤 / 其他管理帳號的變更才重抓目前可見資料。
           await refreshVisibleManagementState();
         }
       )
@@ -857,9 +861,8 @@ function startManagementBroadcast(){
 }
 
 async function announceManagementChange(reason,targetUserId=null){
-  // 先讓本頁立刻更新，不等待廣播往返。
-  await refreshVisibleManagementState();
-
+  // 本頁維持既有的「原地更新」操作體驗，不在這裡重畫整頁。
+  // 廣播只負責通知其他正在開啟管理中心的頁面。
   if(!managementBroadcastChannel || !managementBroadcastReady)return;
 
   try{
@@ -867,6 +870,8 @@ async function announceManagementChange(reason,targetUserId=null){
       type:"broadcast",
       event:"management-change",
       payload:{
+        source_id:managementBroadcastSourceId,
+        actor_user_id:currentUser?.id||null,
         reason:String(reason||"change"),
         target_user_id:targetUserId||null,
         at:Date.now()
@@ -1777,6 +1782,17 @@ async function syncManagementViewNow(force=false){
       existingManager?.dataset?.userId ||
       null;
 
+    const existingHost=existingManager?.querySelector(".subpanel-host");
+    let reopenSelector=null;
+    if(existingHost){
+      if(existingHost.querySelector(".quota-amount,.quota-target-remaining"))reopenSelector=".quota-menu";
+      else if(existingHost.querySelector(".product-switch,.platform-quota-switch"))reopenSelector=".permission-menu";
+      else if(existingHost.querySelector(".contract-start-date,.contract-end-date"))reopenSelector=".contract-menu";
+      else if(existingHost.querySelector(".grant-hours,.reclaim-hours-btn"))reopenSelector=".hours-menu";
+      else if(existingHost.querySelector(".name-input"))reopenSelector=".name-menu";
+      else if(existingHost.querySelector(".p1,.p2"))reopenSelector=".password-menu";
+    }
+
     // 整條目前導覽路徑都刷新，名稱修改後 breadcrumb 也會同步。
     const refreshedStack=[];
     for(const oldCtx of contextStack){
@@ -1835,6 +1851,13 @@ async function syncManagementViewNow(force=false){
         manager.dataset.userId=String(openManagerUid);
         row.appendChild(manager);
         await renderManager(manager,child,row).catch(()=>{});
+
+        // 其他管理者正在看的功能面板也保持打開，
+        // 只把裡面的資料換成最新值，不把人踢回帳號列表。
+        if(reopenSelector){
+          const reopenBtn=manager.querySelector(reopenSelector);
+          if(reopenBtn)reopenBtn.click();
+        }
       }
     }
   }finally{
