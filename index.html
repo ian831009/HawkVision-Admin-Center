@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.3</div>
+  <div class="version">Admin Center v2.3.4</div>
 </header>
 
 <main>
@@ -1800,8 +1800,8 @@ function auditDetailText(item){
     case "MEMBER_HOUR_PACKAGE_RECLAIM": return `收回：${fmt(n.hours_per_package||0)} 小時 × ${fmt(n.package_count||0)} 包`;
     case "MEMBER_HOUR_PACKAGE_ACTIVATE": return `啟用：${fmt(n.hours_per_package||0)} 小時時數包`;
     case "MEMBER_HOURS_RESET": return `已清空所有時數包批次與倒數狀態\n清空前未啟用包數：${fmt(o.available_packages||0)}\n清空前倒數剩餘秒數：${fmt(o.active_remaining_seconds||0)}`;
-    case "QUOTA_ALLOCATE": return `異動：新增 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}`;
-    case "QUOTA_RECLAIM": return `異動：收回 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}`;
+    case "QUOTA_ALLOCATE": return `異動：新增 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}${item.reason?`\n備註：${item.reason}`:""}`;
+    case "QUOTA_RECLAIM": return `異動：收回 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}${item.reason?`\n備註：${item.reason}`:""}`;
     case "DISPLAY_NAME_UPDATE": return `原本名稱：${o.target_display_name||"—"}\n修改後名稱：${n.target_display_name||"—"}`;
     case "COADMIN_PLATFORM_QUOTA_PERMISSION": return `平台額度權限：${boolLabel(n.can_use_platform_quota)}`;
     case "ACCOUNT_CREATE": return `建立帳號：${n.target_display_name||n.target_account||"—"}\n角色：${n.business_role||"—"}${n.initial_quota!=null?`\n初始額度：${fmt(n.initial_quota)}`:""}`;
