@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.9</div>
+  <div class="version">Admin Center v2.3.10</div>
 </header>
 
 <main>
@@ -691,6 +691,7 @@ let accessRecoveryWatch=null;
 let managementSyncWatch=null;
 let managementSyncBusy=false;
 let managementSyncSignature="";
+let managementRealtimeChannel=null;
 
 const loginSection=document.getElementById("loginSection");
 const accessLockedSection=document.getElementById("accessLockedSection");
@@ -1654,6 +1655,38 @@ async function renderManager(manager,child,row){
 }
 
 
+
+async function freshRpc(functionName,body={}){
+  const {data:{session}}=await supabaseClient.auth.getSession();
+  if(!session?.access_token)throw new Error("登入狀態已失效");
+
+  const response=await fetch(
+    `${SUPABASE_URL}/rest/v1/rpc/${encodeURIComponent(functionName)}?_hv=${Date.now()}`,
+    {
+      method:"POST",
+      cache:"no-store",
+      headers:{
+        "Content-Type":"application/json",
+        "apikey":SUPABASE_PUBLISHABLE_KEY,
+        "Authorization":`Bearer ${session.access_token}`,
+        "Cache-Control":"no-cache, no-store, max-age=0",
+        "Pragma":"no-cache"
+      },
+      body:JSON.stringify(body||{})
+    }
+  );
+
+  const text=await response.text();
+  let data=null;
+  try{data=text?JSON.parse(text):null}catch{data=text}
+
+  if(!response.ok){
+    const message=data?.message||data?.details||data?.hint||data?.error||String(data||"資料讀取失敗");
+    throw new Error(message);
+  }
+  return data;
+}
+
 function managementSnapshot(ctx,children){
   const normalized=(Array.isArray(children)?children:[]).map(x=>({
     user_id:x.user_id,
@@ -1684,43 +1717,50 @@ async function syncManagementViewNow(force=false){
   if(managementSyncBusy || !currentUser || !dashboard || dashboard.style.display==="none" || !contextStack.length)return;
   managementSyncBusy=true;
   try{
-    // v2.3.9：永久刪除同步。
-    // 如果目前正在看的節點已被其他管理員永久刪除，
-    // 自動往上退到最近仍存在且可讀取的節點。
     let ctx=contextStack.at(-1);
     let detail=null;
-    let detailError=null;
 
+    // 永久刪除後，如果目前節點本身已不存在，
+    // 往上找到最近仍存在的有效節點。
     while(contextStack.length){
       ctx=contextStack.at(-1);
-      const result=await supabaseClient.rpc("hv_admin_account_detail_v7",{p_target_user_id:ctx.user_id});
-      detail=result.data;
-      detailError=result.error;
+      try{
+        detail=await freshRpc(
+          "hv_admin_account_detail_v7",
+          {p_target_user_id:ctx.user_id}
+        );
+      }catch{
+        detail=null;
+      }
 
-      if(!detailError && detail)break;
+      if(detail)break;
 
       if(contextStack.length>1){
         closeAllPanels();
         contextStack.pop();
         continue;
       }
-
-      // 根節點若暫時讀取失敗，不自行登出；下一輪同步再重試。
       return;
     }
 
     const nextCtx={...ctx,...detail};
 
-    // 子列表獨立讀取；永久刪除後只要列表成功回來，
-    // 即使其他 UI 面板仍保存舊資料，也以最新列表為準。
-    const {data:children,error:childrenError}=await supabaseClient.rpc(
-      "hv_admin_list_children_v3",
-      {p_parent_user_id:nextCtx.user_id}
-    );
-    if(childrenError)return;
+    // v2.3.10 關鍵：
+    // 不再只依賴 supabase-js 的一般 RPC 請求，
+    // 使用 no-store 的原生 fetch 強制取得最新直屬列表。
+    let children;
+    try{
+      children=await freshRpc(
+        "hv_admin_list_children_v3",
+        {p_parent_user_id:nextCtx.user_id}
+      );
+    }catch{
+      return;
+    }
 
     const nextChildren=Array.isArray(children)?children:[];
     const sig=managementSnapshot(nextCtx,nextChildren);
+
     if(!force && sig===managementSyncSignature)return;
 
     contextStack[contextStack.length-1]=nextCtx;
@@ -1730,13 +1770,12 @@ async function syncManagementViewNow(force=false){
     renderContextHeader();
     renderChildren();
 
-    // 若原本開著的管理面板所屬帳號已被永久刪除，
-    // renderChildren 後它自然消失；若帳號仍存在則重新抓詳細資料。
     const openManager=document.querySelector(".account-manager");
     if(openManager){
       const uid=openManager.dataset?.userId;
       const child=currentChildren.find(x=>String(x.user_id)===String(uid));
       const row=child?document.querySelector(`.child-row[data-user-id="${CSS.escape(String(uid))}"]`):null;
+
       if(child && row){
         await renderManager(openManager,child,row).catch(()=>{});
       }else{
@@ -1753,14 +1792,58 @@ function stopManagementSyncWatch(){
     clearInterval(managementSyncWatch);
     managementSyncWatch=null;
   }
+  if(managementRealtimeChannel){
+    try{supabaseClient.removeChannel(managementRealtimeChannel)}catch{}
+    managementRealtimeChannel=null;
+  }
+}
+
+function startManagementRealtimeWatch(){
+  if(managementRealtimeChannel){
+    try{supabaseClient.removeChannel(managementRealtimeChannel)}catch{}
+    managementRealtimeChannel=null;
+  }
+
+  try{
+    managementRealtimeChannel=supabaseClient
+      .channel(`hv-admin-live-${currentUser?.id||"user"}-${Date.now()}`)
+      .on(
+        "postgres_changes",
+        {event:"*",schema:"public",table:"hv_business_accounts"},
+        ()=>{syncManagementViewNow(true).catch(()=>{})}
+      )
+      .on(
+        "postgres_changes",
+        {event:"*",schema:"public",table:"profiles"},
+        ()=>{syncManagementViewNow(true).catch(()=>{})}
+      )
+      .subscribe();
+  }catch{
+    managementRealtimeChannel=null;
+  }
 }
 
 function startManagementSyncWatch(){
   stopManagementSyncWatch();
+
+  // 輪詢是保底機制；Realtime 有事件時會立即觸發。
   managementSyncWatch=setInterval(()=>{
     syncManagementViewNow(false).catch(()=>{});
-  },1500);
+  },1200);
+
+  startManagementRealtimeWatch();
+  syncManagementViewNow(true).catch(()=>{});
 }
+
+window.addEventListener("focus",()=>{
+  syncManagementViewNow(true).catch(()=>{});
+});
+
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"){
+    syncManagementViewNow(true).catch(()=>{});
+  }
+});
 
 async function loadContext(closePanels=true){
   if(closePanels)closeAllPanels();
