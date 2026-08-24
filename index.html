@@ -503,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.18</div>
+  <div class="version">Admin Center v2.3.19</div>
 </header>
 
 <main>
@@ -1346,23 +1346,23 @@ async function refreshToggleActionButtons(manager,detail){
   const enableBtn=manager.querySelector(".toggle-enable-menu");
   if(!disableBtn || !enableBtn)return;
 
-  // 讀取期間先避免連點；完成後依整個分支真實狀態決定是否可用。
-  disableBtn.disabled=true;
-  enableBtn.disabled=true;
-
+  // v2.3.19：
+  // 讀取分支狀態期間不再先把兩顆按鈕一起鎖住。
+  // 這樣「只停用 / 只啟用此帳號」完成後，
+  // 使用者仍可立刻選擇另一種範圍，不會看到兩顆同時灰色。
   try{
     const summary=await getBranchEnableSummary(
       detail.user_id,
       detail.is_enabled
     );
 
-    // 整個分支都已停用 -> 停用按鈕灰色。
-    // 整個分支都已啟用 -> 啟用按鈕灰色。
-    // 混合狀態 -> 兩個按鈕都可操作。
-    disableBtn.disabled=!summary.anyEnabled;
-    enableBtn.disabled=!summary.anyDisabled;
+    // 全分支已停用：只有停用按鈕灰色。
+    // 全分支已啟用：只有啟用按鈕灰色。
+    // 混合狀態：兩顆都可點。
+    disableBtn.disabled=(summary.anyEnabled!==true);
+    enableBtn.disabled=(summary.anyDisabled!==true);
   }catch{
-    // 若讀取分支狀態暫時失敗，不誤鎖功能。
+    // 讀取失敗時寧可保持可操作，不誤鎖功能。
     disableBtn.disabled=false;
     enableBtn.disabled=false;
   }
@@ -1801,7 +1801,20 @@ async function renderManager(manager,child,row){
         detail.is_enabled=enabling;
         updateRowSummary(row,child);
         await patchOpenManagerInPlace(child);
-        await refreshToggleActionButtons(manager,detail);
+
+        const disableBtn=manager.querySelector(".toggle-disable-menu");
+        const enableBtn=manager.querySelector(".toggle-enable-menu");
+
+        if(scope==="self"){
+          // 單獨改本人後，先保留兩種操作都可選，
+          // 讓使用者可直接改成整個分支，不必先反向操作。
+          if(disableBtn)disableBtn.disabled=false;
+          if(enableBtn)enableBtn.disabled=false;
+
+          refreshToggleActionButtons(manager,detail).catch(()=>{});
+        }else{
+          await refreshToggleActionButtons(manager,detail);
+        }
 
         localStatus(
           host,
