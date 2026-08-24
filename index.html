@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.6</div>
+  <div class="version">Admin Center v2.3.7</div>
 </header>
 
 <main>
@@ -511,6 +511,13 @@ body{
   </div>
   <div id="loginStatus" class="status error"></div>
   <button id="loginBtn" class="primary">登入管理中心</button>
+</section>
+
+<section id="accessLockedSection" class="login-card" style="display:none" aria-hidden="true">
+  <h2>管理中心權限目前未開放</h2>
+  <p class="muted">你的登入狀態仍保留。上層重新開啟管理中心權限後，此頁會自動重新確認並恢復進入，不需要登出再登入。</p>
+  <div id="accessLockedStatus" class="status error" style="display:block">正在等待權限重新開啟…</div>
+  <button id="accessRecheckBtn" class="primary" type="button">立即重新檢查</button>
 </section>
 
 <section id="claimSection">
@@ -680,8 +687,10 @@ const ACCOUNT_PASSWORD_RE=/^(?=.{6,11}$)(?=.*[a-z])(?=(?:.*\d){5,})[a-z0-9]+$/;
 
 let currentUser=null,currentSelf=null,currentChildren=[],contextStack=[],createAllowedRoles=[];let appliedSearch="";
 let sessionWatch=null;
+let accessRecoveryWatch=null;
 
 const loginSection=document.getElementById("loginSection");
+const accessLockedSection=document.getElementById("accessLockedSection");
 const claimSection=document.getElementById("claimSection");
 const dashboard=document.getElementById("dashboard");
 
@@ -771,7 +780,12 @@ function notify(msg,type="success"){
   },3000);
 }
 function showPage(msg,type="success"){notify(msg,type)}
-function showOnly(which){loginSection.style.display=which==="login"?"block":"none";claimSection.style.display=which==="claim"?"block":"none";dashboard.style.display=which==="dashboard"?"block":"none"}
+function showOnly(which){
+  loginSection.style.display=which==="login"?"block":"none";
+  accessLockedSection.style.display=which==="locked"?"block":"none";
+  claimSection.style.display=which==="claim"?"block":"none";
+  dashboard.style.display=which==="dashboard"?"block":"none";
+}
 
 function bindPasswordToggles(scope=document){
   scope.querySelectorAll("[data-toggle-password]").forEach(btn=>{
@@ -828,7 +842,90 @@ function closeAllPanels(){
   resetCreateForm();
 }
 
+
+function stopAccessRecoveryWatch(){
+  if(accessRecoveryWatch){
+    clearInterval(accessRecoveryWatch);
+    accessRecoveryWatch=null;
+  }
+}
+
+async function recheckAdminCenterAccess(){
+  if(!currentUser)return false;
+
+  const [{data:hasAdminAccess,error:accessError},{data:effectiveAccess,error:effectiveError}] = await Promise.all([
+    supabaseClient.rpc("hv_has_product_access",{p_user_id:currentUser.id,p_product_key:"admin_center"}),
+    supabaseClient.rpc("hv_effective_access_v2",{p_user_id:currentUser.id})
+  ]);
+
+  if(effectiveError)throw effectiveError;
+  if(accessError)throw accessError;
+
+  if(effectiveAccess?.allowed===false){
+    stopAccessRecoveryWatch();
+    await supabaseClient.auth.signOut().catch(()=>{});
+    currentUser=null;currentSelf=null;
+    showOnly("login");
+    setStatus(
+      document.getElementById("loginStatus"),
+      effectiveAccess.reason==="CONTRACT"
+        ?"合約已到期或尚未開始，請聯絡上層管理者"
+        :"此帳號目前已停用，無法使用管理中心",
+      "error",
+      true
+    );
+    return false;
+  }
+
+  if(hasAdminAccess===true){
+    stopAccessRecoveryWatch();
+    await loadDashboard();
+    return true;
+  }
+
+  showOnly("locked");
+  const status=document.getElementById("accessLockedStatus");
+  if(status){
+    status.textContent="管理中心權限尚未重新開啟，系統會自動持續檢查。";
+    status.className="status error";
+    status.style.display="block";
+  }
+  return false;
+}
+
+function startAccessRecoveryWatch(){
+  stopAccessRecoveryWatch();
+  accessRecoveryWatch=setInterval(async()=>{
+    try{
+      await recheckAdminCenterAccess();
+    }catch(e){
+      const status=document.getElementById("accessLockedStatus");
+      if(status){
+        status.textContent="重新檢查失敗："+translateError(e.message||e);
+        status.className="status error";
+        status.style.display="block";
+      }
+    }
+  },1500);
+}
+
+function handleProductAccessRevoked(){
+  if(sessionWatch){
+    clearInterval(sessionWatch);
+    sessionWatch=null;
+  }
+  showOnly("locked");
+  const status=document.getElementById("accessLockedStatus");
+  if(status){
+    status.textContent="管理中心權限已收回；重新開啟後會自動恢復，不需要重新登入。";
+    status.className="status error";
+    status.style.display="block";
+  }
+  startAccessRecoveryWatch();
+}
+
 async function handleDisabled(){
+  stopAccessRecoveryWatch();
   if(sessionWatch){clearInterval(sessionWatch);sessionWatch=null}
   await supabaseClient.auth.signOut().catch(()=>{});
   currentUser=null;currentSelf=null;currentChildren=[];contextStack=[];
@@ -837,15 +934,36 @@ async function handleDisabled(){
 }
 function startSessionWatch(){
   if(sessionWatch)clearInterval(sessionWatch);
+  stopAccessRecoveryWatch();
   sessionWatch=setInterval(async()=>{
     if(!currentUser)return;
-    const {data,error}=await supabaseClient.rpc("hv_effective_access_v2",{p_user_id:currentUser.id});
-    if(!error&&data&&data.allowed===false){
+
+    const [
+      {data:effectiveAccess,error:effectiveError},
+      {data:hasAdminAccess,error:accessError}
+    ]=await Promise.all([
+      supabaseClient.rpc("hv_effective_access_v2",{p_user_id:currentUser.id}),
+      supabaseClient.rpc("hv_has_product_access",{p_user_id:currentUser.id,p_product_key:"admin_center"})
+    ]);
+
+    if(!effectiveError&&effectiveAccess&&effectiveAccess.allowed===false){
       await supabaseClient.auth.signOut().catch(()=>{});
       currentUser=null;currentSelf=null;showOnly("login");
-      setStatus(document.getElementById("loginStatus"),data.reason==="CONTRACT"?"合約已到期或尚未開始，請聯絡上層管理者":"此帳號目前已停用，無法使用管理中心","error",true);
+      setStatus(
+        document.getElementById("loginStatus"),
+        effectiveAccess.reason==="CONTRACT"
+          ?"合約已到期或尚未開始，請聯絡上層管理者"
+          :"此帳號目前已停用，無法使用管理中心",
+        "error",
+        true
+      );
+      return;
     }
-  },1000);
+
+    if(!accessError&&hasAdminAccess!==true){
+      handleProductAccessRevoked();
+    }
+  },1500);
 }
 
 async function selfDetail(){
@@ -1676,8 +1794,19 @@ async function createAccount(){
 async function loadDashboard(){
   const {data:hasAdminAccess,error:adminAccessError}=await supabaseClient.rpc("hv_has_product_access",{p_user_id:currentUser.id,p_product_key:"admin_center"});
   if(adminAccessError)throw adminAccessError;
-  if(hasAdminAccess!==true){await supabaseClient.auth.signOut({scope:"global"}).catch(()=>{});throw new Error("此帳號沒有管理中心使用權限");}
+  if(hasAdminAccess!==true){
+    showOnly("locked");
+    const status=document.getElementById("accessLockedStatus");
+    if(status){
+      status.textContent="此帳號目前沒有管理中心使用權限；重新開啟後會自動恢復，不需要重新登入。";
+      status.className="status error";
+      status.style.display="block";
+    }
+    startAccessRecoveryWatch();
+    return false;
+  }
 
+  stopAccessRecoveryWatch();
   currentSelf=await selfDetail();
   const {data:effectiveAccess,error:effectiveError}=await supabaseClient.rpc("hv_effective_access_v2",{p_user_id:currentUser.id});
   if(effectiveError)throw effectiveError;
@@ -1975,6 +2104,23 @@ function openSelfPassword(){
   });
 }
 
+document.getElementById("accessRecheckBtn").addEventListener("click",async()=>{
+  const status=document.getElementById("accessLockedStatus");
+  if(status){
+    status.textContent="正在重新檢查管理中心權限…";
+    status.className="status";
+    status.style.display="block";
+  }
+  try{
+    await recheckAdminCenterAccess();
+  }catch(e){
+    if(status){
+      status.textContent="重新檢查失敗："+translateError(e.message||e);
+      status.className="status error";
+      status.style.display="block";
+    }
+  }
+});
 document.getElementById("loginBtn").addEventListener("click",login);
 document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
 document.getElementById("claimBtn").addEventListener("click",claimPassword);
