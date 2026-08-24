@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.15</div>
+  <div class="version">Admin Center v2.3.16</div>
 </header>
 
 <main>
@@ -1947,6 +1947,22 @@ async function patchOpenManagerInPlace(child){
   if(titleStrong){
     titleStrong.textContent=
       `${child.display_name||"未命名"}｜${child.role_name||ROLE_LABEL[child.business_role]||""}`;
+  }
+
+  // v2.3.16：只補已展開管理框內「目前有效狀態」同步。
+  // 不重建 manager、不關閉子面板、不影響其他已驗收功能。
+  const stateBox=manager.querySelector(".effective-status");
+  if(stateBox){
+    stateBox.textContent=`目前有效狀態：${child.is_enabled?"啟用中":"已停用"}`;
+    stateBox.classList.toggle("disabled",child.is_enabled===false);
+  }else{
+    // 相容既有 HTML：若沒有專用 class，就找顯示「目前有效狀態」的元素。
+    const fallback=[...manager.querySelectorAll("div,p,span")].find(
+      el=>String(el.textContent||"").trim().startsWith("目前有效狀態：")
+    );
+    if(fallback){
+      fallback.textContent=`目前有效狀態：${child.is_enabled?"啟用中":"已停用"}`;
+    }
   }
 
   const host=manager.querySelector(".subpanel-host");
