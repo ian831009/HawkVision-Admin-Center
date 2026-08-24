@@ -73,6 +73,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
   .grid,.quota-summary{grid-template-columns:1fr}.toolbar{align-items:stretch}.toolbar input{max-width:none}
   .section{padding:15px}.child-row{padding:12px}
   .row-actions button,.manager-menu button{flex:1 1 calc(50% - 8px)}
+.manager-menu button:disabled{
+  opacity:.42;
+  cursor:not-allowed;
+  filter:grayscale(.7);
+  box-shadow:none;
+}
+
   .panel-actions button{flex:1 1 120px}
   .context-line{align-items:flex-start}.nav-actions{width:100%}.nav-actions button{flex:1}
 }
@@ -496,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.16</div>
+  <div class="version">Admin Center v2.3.18</div>
 </header>
 
 <main>
@@ -1294,6 +1301,73 @@ async function refreshChildrenDataOnly(){
   renderChildren();
 }
 
+
+async function getBranchEnableSummary(rootUserId,rootEnabled){
+  let anyEnabled=Boolean(rootEnabled);
+  let anyDisabled=!Boolean(rootEnabled);
+  const visited=new Set([String(rootUserId)]);
+  const queue=[String(rootUserId)];
+
+  while(queue.length){
+    const parentId=queue.shift();
+    const {data,error}=await supabaseClient.rpc(
+      "hv_admin_list_children_v3",
+      {p_parent_user_id:parentId}
+    );
+
+    if(error)break;
+
+    const children=Array.isArray(data)?data:[];
+    for(const item of children){
+      const id=String(item.user_id||"");
+      if(!id || visited.has(id))continue;
+      visited.add(id);
+
+      if(item.is_enabled===true)anyEnabled=true;
+      else anyDisabled=true;
+
+      // 會員沒有下屬；其他管理層才繼續往下查。
+      if(item.business_role!=="member"){
+        queue.push(id);
+      }
+
+      if(anyEnabled && anyDisabled){
+        // 已確定是混合狀態；不用為了按鈕灰階繼續查完整棵樹。
+        return {anyEnabled:true,anyDisabled:true};
+      }
+    }
+  }
+
+  return {anyEnabled,anyDisabled};
+}
+
+async function refreshToggleActionButtons(manager,detail){
+  const disableBtn=manager.querySelector(".toggle-disable-menu");
+  const enableBtn=manager.querySelector(".toggle-enable-menu");
+  if(!disableBtn || !enableBtn)return;
+
+  // 讀取期間先避免連點；完成後依整個分支真實狀態決定是否可用。
+  disableBtn.disabled=true;
+  enableBtn.disabled=true;
+
+  try{
+    const summary=await getBranchEnableSummary(
+      detail.user_id,
+      detail.is_enabled
+    );
+
+    // 整個分支都已停用 -> 停用按鈕灰色。
+    // 整個分支都已啟用 -> 啟用按鈕灰色。
+    // 混合狀態 -> 兩個按鈕都可操作。
+    disableBtn.disabled=!summary.anyEnabled;
+    enableBtn.disabled=!summary.anyDisabled;
+  }catch{
+    // 若讀取分支狀態暫時失敗，不誤鎖功能。
+    disableBtn.disabled=false;
+    enableBtn.disabled=false;
+  }
+}
+
 async function renderManager(manager,child,row){
   const [{data,error},{data:takeoverPlan,error:takeoverError},{data:permissionPolicy,error:permissionPolicyError},{data:effectiveAccess,error:effectiveError}]=await Promise.all([
     supabaseClient.rpc("hv_admin_account_detail_v7",{p_target_user_id:child.user_id}),
@@ -1307,7 +1381,7 @@ async function renderManager(manager,child,row){
   detail.permission_policy=permissionPolicyError?[]:(Array.isArray(permissionPolicy)?permissionPolicy:[]);
   const showPermissionMenu=detail.business_role!=="member" && detail.permission_policy.length>0;
   manager.innerHTML=`<div class="manager-title"><strong>${escapeHtml(detail.display_name||"未命名")}｜${escapeHtml(detail.role_name||ROLE_LABEL[detail.business_role]||"")}</strong><button class="secondary close-manager" type="button">收起</button></div>
-    <div class="status ${effectiveAccess?.allowed===true?"success":"error"}" style="display:block;margin-bottom:12px">目前有效狀態：${escapeHtml(effectiveError?"狀態讀取失敗":effectiveStatusLabel(effectiveAccess))}${effectiveAccess?.blocking_display_name&&effectiveAccess?.blocking_user_id!==detail.user_id?`<br><span class="hint">限制來源：${escapeHtml(effectiveAccess.blocking_display_name)}</span>`:""}</div>
+    <div class="status effective-status ${effectiveAccess?.allowed===true?"success":"error"}" style="display:block;margin-bottom:12px">目前有效狀態：${escapeHtml(effectiveError?"狀態讀取失敗":effectiveStatusLabel(effectiveAccess))}${effectiveAccess?.blocking_display_name&&effectiveAccess?.blocking_user_id!==detail.user_id?`<br><span class="hint">限制來源：${escapeHtml(effectiveAccess.blocking_display_name)}</span>`:""}</div>
     ${readonly?`<div class="readonly-note">目前為跨層查看模式：只能查看，不能異動。</div>`:""}
     <div class="manager-menu">
       ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
@@ -1318,7 +1392,10 @@ async function renderManager(manager,child,row){
     </div>
     <div class="subpanel-host"></div>
     ${readonly?"":`<div class="danger-zone"><div class="manager-menu">
-      ${detail.can_toggle_enabled?`<button class="${detail.is_enabled?"danger-soft":"soft-green"} toggle-menu" type="button">${detail.is_enabled?"停用帳號":"啟用帳號"}</button>`:""}
+      ${detail.can_toggle_enabled?`
+        <button class="danger-soft toggle-disable-menu" type="button">停用帳號</button>
+        <button class="soft-green toggle-enable-menu" type="button">啟用帳號</button>
+      `:""}
       ${detail.takeover_delete_plan?.allowed===true?'<button class="danger delete-menu" type="button">刪除帳號</button>':""}
     </div>
     ${detail.is_enabled===false && detail.takeover_delete_plan && detail.takeover_delete_plan.allowed!==true
@@ -1690,8 +1767,7 @@ async function renderManager(manager,child,row){
     });
   });
 
-  manager.querySelector(".toggle-menu")?.addEventListener("click",()=>{
-    const enabling=!detail.is_enabled;
+  const openTogglePanel=(enabling)=>{
     host.innerHTML=`<div class="subpanel">
       <div><strong>${enabling?"啟用":"停用"}方式</strong></div>
       <label class="switch-line" style="margin-top:10px">
@@ -1713,21 +1789,50 @@ async function renderManager(manager,child,row){
         ? `${enabling?"啟用":"停用"}「${detail.display_name||detail.account}」以及所有下屬？`
         : `${enabling?"啟用":"停用"}「${detail.display_name||detail.account}」？`;
       if(!confirm(text))return;
+
       try{
         const result=await api("/set-account-enabled",{
           target_user_id:child.user_id,
           enabled:enabling,
           scope
         });
+
         child.is_enabled=enabling;
         detail.is_enabled=enabling;
         updateRowSummary(row,child);
-        localStatus(host,result.message||`✓ 帳號已${enabling?"啟用":"停用"}`,"success");
-        scheduleManagerRefresh(manager,child,row,".toggle-menu");
-      }catch(e){localStatus(host,e.message||e,"error")}
-    });
-  });
+        await patchOpenManagerInPlace(child);
+        await refreshToggleActionButtons(manager,detail);
 
+        localStatus(
+          host,
+          result.message||`✓ 帳號已${enabling?"啟用":"停用"}`,
+          "success"
+        );
+
+        scheduleManagerRefresh(
+          manager,
+          child,
+          row,
+          enabling?".toggle-enable-menu":".toggle-disable-menu"
+        );
+      }catch(e){
+        localStatus(host,e.message||e,"error");
+        await refreshToggleActionButtons(manager,detail);
+      }
+    });
+  };
+
+  manager.querySelector(".toggle-disable-menu")?.addEventListener(
+    "click",
+    ()=>openTogglePanel(false)
+  );
+
+  manager.querySelector(".toggle-enable-menu")?.addEventListener(
+    "click",
+    ()=>openTogglePanel(true)
+  );
+
+  await refreshToggleActionButtons(manager,detail);
   manager.querySelector(".delete-menu")?.addEventListener("click",async()=>{
     const plan=detail.takeover_delete_plan||{};
     const transferCount=Number(plan.direct_children||0);
@@ -1789,7 +1894,10 @@ function captureVisibleManagerUiState(){
     else if(host.querySelector(".grant-hours,.reclaim-hours-btn"))reopenSelector=".hours-menu";
     else if(host.querySelector(".name-input"))reopenSelector=".name-menu";
     else if(host.querySelector(".p1,.p2"))reopenSelector=".password-menu";
-    else if(host.querySelector('input[name="enabledScope"]'))reopenSelector=".toggle-menu";
+    else if(host.querySelector('input[name="enabledScope"]')){
+      const title=String(host.querySelector(".subpanel strong")?.textContent||"");
+      reopenSelector=title.includes("啟用")?".toggle-enable-menu":".toggle-disable-menu";
+    }
   }
 
   let statusState=null;
@@ -1954,16 +2062,11 @@ async function patchOpenManagerInPlace(child){
   const stateBox=manager.querySelector(".effective-status");
   if(stateBox){
     stateBox.textContent=`目前有效狀態：${child.is_enabled?"啟用中":"已停用"}`;
-    stateBox.classList.toggle("disabled",child.is_enabled===false);
-  }else{
-    // 相容既有 HTML：若沒有專用 class，就找顯示「目前有效狀態」的元素。
-    const fallback=[...manager.querySelectorAll("div,p,span")].find(
-      el=>String(el.textContent||"").trim().startsWith("目前有效狀態：")
-    );
-    if(fallback){
-      fallback.textContent=`目前有效狀態：${child.is_enabled?"啟用中":"已停用"}`;
-    }
+    stateBox.classList.toggle("success",child.is_enabled===true);
+    stateBox.classList.toggle("error",child.is_enabled===false);
   }
+
+  await refreshToggleActionButtons(manager,child);
 
   const host=manager.querySelector(".subpanel-host");
   if(!host)return;
