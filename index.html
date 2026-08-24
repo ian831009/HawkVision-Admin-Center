@@ -503,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.19</div>
+  <div class="version">Admin Center v2.3.20</div>
 </header>
 
 <main>
@@ -1346,25 +1346,32 @@ async function refreshToggleActionButtons(manager,detail){
   const enableBtn=manager.querySelector(".toggle-enable-menu");
   if(!disableBtn || !enableBtn)return;
 
-  // v2.3.19：
-  // 讀取分支狀態期間不再先把兩顆按鈕一起鎖住。
-  // 這樣「只停用 / 只啟用此帳號」完成後，
-  // 使用者仍可立刻選擇另一種範圍，不會看到兩顆同時灰色。
+  // v2.3.20：
+  // 「本人已停用」不能等同於「整個分支都已停用」。
+  // 即使本人已停用，仍必須保留「停用帳號」可點，
+  // 讓使用者可以直接改選「停用此帳號＋所有下屬」。
+  //
+  // 因此這裡不再用停用中的 parent 去遞迴讀取下屬，
+  // 避免因讀取權限/管理關係造成誤判。
+  if(detail.is_enabled===false){
+    disableBtn.disabled=false;
+    enableBtn.disabled=false;
+    return;
+  }
+
+  // 本人啟用中時，停用一定有意義。
+  disableBtn.disabled=false;
+
+  // 啟用本人本身沒有意義；但若能可靠讀到停用下屬，
+  // 則仍可用「啟用帳號＋所有下屬」。
   try{
     const summary=await getBranchEnableSummary(
       detail.user_id,
-      detail.is_enabled
+      true
     );
-
-    // 全分支已停用：只有停用按鈕灰色。
-    // 全分支已啟用：只有啟用按鈕灰色。
-    // 混合狀態：兩顆都可點。
-    disableBtn.disabled=(summary.anyEnabled!==true);
     enableBtn.disabled=(summary.anyDisabled!==true);
   }catch{
-    // 讀取失敗時寧可保持可操作，不誤鎖功能。
-    disableBtn.disabled=false;
-    enableBtn.disabled=false;
+    enableBtn.disabled=true;
   }
 }
 
@@ -1806,12 +1813,14 @@ async function renderManager(manager,child,row){
         const enableBtn=manager.querySelector(".toggle-enable-menu");
 
         if(scope==="self"){
-          // 單獨改本人後，先保留兩種操作都可選，
-          // 讓使用者可直接改成整個分支，不必先反向操作。
-          if(disableBtn)disableBtn.disabled=false;
-          if(enableBtn)enableBtn.disabled=false;
-
-          refreshToggleActionButtons(manager,detail).catch(()=>{});
+          // 單獨改本人後直接依本人最新狀態套用按鈕規則。
+          // 特別是「只停用本人」後，停用與啟用都保持可點。
+          if(detail.is_enabled===false){
+            if(disableBtn)disableBtn.disabled=false;
+            if(enableBtn)enableBtn.disabled=false;
+          }else{
+            await refreshToggleActionButtons(manager,detail);
+          }
         }else{
           await refreshToggleActionButtons(manager,detail);
         }
