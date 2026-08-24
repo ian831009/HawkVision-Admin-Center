@@ -503,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.20</div>
+  <div class="version">Admin Center v2.3.21</div>
 </header>
 
 <main>
@@ -1346,33 +1346,12 @@ async function refreshToggleActionButtons(manager,detail){
   const enableBtn=manager.querySelector(".toggle-enable-menu");
   if(!disableBtn || !enableBtn)return;
 
-  // v2.3.20：
-  // 「本人已停用」不能等同於「整個分支都已停用」。
-  // 即使本人已停用，仍必須保留「停用帳號」可點，
-  // 讓使用者可以直接改選「停用此帳號＋所有下屬」。
-  //
-  // 因此這裡不再用停用中的 parent 去遞迴讀取下屬，
-  // 避免因讀取權限/管理關係造成誤判。
-  if(detail.is_enabled===false){
-    disableBtn.disabled=false;
-    enableBtn.disabled=false;
-    return;
-  }
-
-  // 本人啟用中時，停用一定有意義。
+  // v2.3.21：
+  // 停用 / 啟用兩顆按鈕固定存在且永遠可操作。
+  // 不再依本人狀態或整個分支狀態做灰階判定，
+  // 操作範圍由使用者進入後自行選擇「只此帳號」或「此帳號＋所有下屬」。
   disableBtn.disabled=false;
-
-  // 啟用本人本身沒有意義；但若能可靠讀到停用下屬，
-  // 則仍可用「啟用帳號＋所有下屬」。
-  try{
-    const summary=await getBranchEnableSummary(
-      detail.user_id,
-      true
-    );
-    enableBtn.disabled=(summary.anyDisabled!==true);
-  }catch{
-    enableBtn.disabled=true;
-  }
+  enableBtn.disabled=false;
 }
 
 async function renderManager(manager,child,row){
@@ -1809,21 +1788,8 @@ async function renderManager(manager,child,row){
         updateRowSummary(row,child);
         await patchOpenManagerInPlace(child);
 
-        const disableBtn=manager.querySelector(".toggle-disable-menu");
-        const enableBtn=manager.querySelector(".toggle-enable-menu");
-
-        if(scope==="self"){
-          // 單獨改本人後直接依本人最新狀態套用按鈕規則。
-          // 特別是「只停用本人」後，停用與啟用都保持可點。
-          if(detail.is_enabled===false){
-            if(disableBtn)disableBtn.disabled=false;
-            if(enableBtn)enableBtn.disabled=false;
-          }else{
-            await refreshToggleActionButtons(manager,detail);
-          }
-        }else{
-          await refreshToggleActionButtons(manager,detail);
-        }
+        // 停用 / 啟用兩顆按鈕固定保持可操作。
+        await refreshToggleActionButtons(manager,detail);
 
         localStatus(
           host,
