@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.10</div>
+  <div class="version">Admin Center v2.3.11</div>
 </header>
 
 <main>
@@ -691,7 +691,8 @@ let accessRecoveryWatch=null;
 let managementSyncWatch=null;
 let managementSyncBusy=false;
 let managementSyncSignature="";
-let managementRealtimeChannel=null;
+let deletionWatch=null;
+const deletedAccountTombstones=new Set();
 
 const loginSection=document.getElementById("loginSection");
 const accessLockedSection=document.getElementById("accessLockedSection");
@@ -914,6 +915,7 @@ function startAccessRecoveryWatch(){
 }
 
 function handleProductAccessRevoked(){
+  stopDeletionWatch();
   stopManagementSyncWatch();
   if(sessionWatch){
     clearInterval(sessionWatch);
@@ -930,6 +932,7 @@ function handleProductAccessRevoked(){
 }
 
 async function handleDisabled(){
+  stopDeletionWatch();
   stopManagementSyncWatch();
   stopAccessRecoveryWatch();
   if(sessionWatch){clearInterval(sessionWatch);sessionWatch=null}
@@ -1132,6 +1135,12 @@ function childRowHtml(c){
   </div>`;
 }
 function renderChildren(){
+  // 已由永久刪除偵測器確認不存在的帳號，不再讓舊列表快照把它畫回來。
+  if(deletedAccountTombstones.size){
+    currentChildren=currentChildren.filter(
+      x=>!deletedAccountTombstones.has(String(x.user_id))
+    );
+  }
   const list=document.getElementById("childList"),all=filteredChildren(),active=all.filter(x=>x.is_enabled),disabled=all.filter(x=>!x.is_enabled);
   document.getElementById("accountCount").textContent=`顯示 ${all.length} / ${currentChildren.length} 個下屬`;
   if(!all.length){list.innerHTML='<div class="empty">目前沒有符合的下屬帳號</div>';return}
@@ -1655,38 +1664,6 @@ async function renderManager(manager,child,row){
 }
 
 
-
-async function freshRpc(functionName,body={}){
-  const {data:{session}}=await supabaseClient.auth.getSession();
-  if(!session?.access_token)throw new Error("登入狀態已失效");
-
-  const response=await fetch(
-    `${SUPABASE_URL}/rest/v1/rpc/${encodeURIComponent(functionName)}?_hv=${Date.now()}`,
-    {
-      method:"POST",
-      cache:"no-store",
-      headers:{
-        "Content-Type":"application/json",
-        "apikey":SUPABASE_PUBLISHABLE_KEY,
-        "Authorization":`Bearer ${session.access_token}`,
-        "Cache-Control":"no-cache, no-store, max-age=0",
-        "Pragma":"no-cache"
-      },
-      body:JSON.stringify(body||{})
-    }
-  );
-
-  const text=await response.text();
-  let data=null;
-  try{data=text?JSON.parse(text):null}catch{data=text}
-
-  if(!response.ok){
-    const message=data?.message||data?.details||data?.hint||data?.error||String(data||"資料讀取失敗");
-    throw new Error(message);
-  }
-  return data;
-}
-
 function managementSnapshot(ctx,children){
   const normalized=(Array.isArray(children)?children:[]).map(x=>({
     user_id:x.user_id,
@@ -1717,69 +1694,35 @@ async function syncManagementViewNow(force=false){
   if(managementSyncBusy || !currentUser || !dashboard || dashboard.style.display==="none" || !contextStack.length)return;
   managementSyncBusy=true;
   try{
-    let ctx=contextStack.at(-1);
-    let detail=null;
+    const ctx=contextStack.at(-1);
+    const [{data:detail,error:detailError},{data:children,error:childrenError}]=await Promise.all([
+      supabaseClient.rpc("hv_admin_account_detail_v7",{p_target_user_id:ctx.user_id}),
+      supabaseClient.rpc("hv_admin_list_children_v3",{p_parent_user_id:ctx.user_id})
+    ]);
+    if(detailError||childrenError)return;
 
-    // 永久刪除後，如果目前節點本身已不存在，
-    // 往上找到最近仍存在的有效節點。
-    while(contextStack.length){
-      ctx=contextStack.at(-1);
-      try{
-        detail=await freshRpc(
-          "hv_admin_account_detail_v7",
-          {p_target_user_id:ctx.user_id}
-        );
-      }catch{
-        detail=null;
-      }
-
-      if(detail)break;
-
-      if(contextStack.length>1){
-        closeAllPanels();
-        contextStack.pop();
-        continue;
-      }
-      return;
-    }
-
-    const nextCtx={...ctx,...detail};
-
-    // v2.3.10 關鍵：
-    // 不再只依賴 supabase-js 的一般 RPC 請求，
-    // 使用 no-store 的原生 fetch 強制取得最新直屬列表。
-    let children;
-    try{
-      children=await freshRpc(
-        "hv_admin_list_children_v3",
-        {p_parent_user_id:nextCtx.user_id}
-      );
-    }catch{
-      return;
-    }
-
+    const nextCtx=detail?{...ctx,...detail}:ctx;
     const nextChildren=Array.isArray(children)?children:[];
     const sig=managementSnapshot(nextCtx,nextChildren);
-
     if(!force && sig===managementSyncSignature)return;
 
     contextStack[contextStack.length-1]=nextCtx;
     currentChildren=nextChildren;
     managementSyncSignature=sig;
 
+    // 即時更新目前節點、列表狀態、額度與排序。
     renderContextHeader();
     renderChildren();
 
+    // 若目前有開啟某帳號管理面板，重新抓該帳號詳細資料，
+    // 讓權限/額度/停用等內容也同步，不必 F5。
     const openManager=document.querySelector(".account-manager");
     if(openManager){
       const uid=openManager.dataset?.userId;
       const child=currentChildren.find(x=>String(x.user_id)===String(uid));
       const row=child?document.querySelector(`.child-row[data-user-id="${CSS.escape(String(uid))}"]`):null;
-
       if(child && row){
         await renderManager(openManager,child,row).catch(()=>{});
-      }else{
-        openManager.remove();
       }
     }
   }finally{
@@ -1792,58 +1735,104 @@ function stopManagementSyncWatch(){
     clearInterval(managementSyncWatch);
     managementSyncWatch=null;
   }
-  if(managementRealtimeChannel){
-    try{supabaseClient.removeChannel(managementRealtimeChannel)}catch{}
-    managementRealtimeChannel=null;
-  }
-}
-
-function startManagementRealtimeWatch(){
-  if(managementRealtimeChannel){
-    try{supabaseClient.removeChannel(managementRealtimeChannel)}catch{}
-    managementRealtimeChannel=null;
-  }
-
-  try{
-    managementRealtimeChannel=supabaseClient
-      .channel(`hv-admin-live-${currentUser?.id||"user"}-${Date.now()}`)
-      .on(
-        "postgres_changes",
-        {event:"*",schema:"public",table:"hv_business_accounts"},
-        ()=>{syncManagementViewNow(true).catch(()=>{})}
-      )
-      .on(
-        "postgres_changes",
-        {event:"*",schema:"public",table:"profiles"},
-        ()=>{syncManagementViewNow(true).catch(()=>{})}
-      )
-      .subscribe();
-  }catch{
-    managementRealtimeChannel=null;
-  }
 }
 
 function startManagementSyncWatch(){
   stopManagementSyncWatch();
-
-  // 輪詢是保底機制；Realtime 有事件時會立即觸發。
   managementSyncWatch=setInterval(()=>{
     syncManagementViewNow(false).catch(()=>{});
-  },1200);
-
-  startManagementRealtimeWatch();
-  syncManagementViewNow(true).catch(()=>{});
+  },1500);
 }
 
-window.addEventListener("focus",()=>{
-  syncManagementViewNow(true).catch(()=>{});
-});
 
-document.addEventListener("visibilitychange",()=>{
-  if(document.visibilityState==="visible"){
-    syncManagementViewNow(true).catch(()=>{});
+function stopDeletionWatch(){
+  if(deletionWatch){
+    clearInterval(deletionWatch);
+    deletionWatch=null;
   }
-});
+}
+
+async function accountStillExistsForViewer(userId){
+  try{
+    const {data,error}=await supabaseClient.rpc(
+      "hv_admin_account_detail_v7",
+      {p_target_user_id:userId}
+    );
+
+    if(!error && data)return true;
+
+    const msg=String(error?.message||"").toLowerCase();
+    // 只有明確「不存在」才當永久刪除；權限/網路暫時失敗不誤刪畫面。
+    if(
+      !data &&
+      (
+        !error ||
+        msg.includes("找不到") ||
+        msg.includes("not found") ||
+        msg.includes("does not exist")
+      )
+    ){
+      return false;
+    }
+
+    return null;
+  }catch{
+    return null;
+  }
+}
+
+async function checkPermanentDeletionNow(){
+  if(!currentUser || !dashboard || dashboard.style.display==="none" || !contextStack.length)return;
+
+  // 1. 若目前正在看的節點本身被其他管理員永久刪除，自動退回上一層。
+  if(contextStack.length>1){
+    const ctx=contextStack.at(-1);
+    const exists=await accountStillExistsForViewer(ctx.user_id);
+    if(exists===false){
+      deletedAccountTombstones.add(String(ctx.user_id));
+      closeAllPanels();
+      contextStack.pop();
+      await loadContext(false).catch(()=>{});
+      notify("目前查看的帳號已被永久刪除，已自動返回上一層","success");
+      return;
+    }
+  }
+
+  // 2. 獨立檢查目前畫面上的直屬帳號是否仍存在。
+  //    這不改動 v2.3.8 原本的額度/名稱/權限/停用同步。
+  const snapshot=[...currentChildren];
+  if(!snapshot.length)return;
+
+  const results=await Promise.all(
+    snapshot.map(async child=>({
+      id:String(child.user_id),
+      exists:await accountStillExistsForViewer(child.user_id)
+    }))
+  );
+
+  const removed=results.filter(x=>x.exists===false).map(x=>x.id);
+  if(!removed.length)return;
+
+  removed.forEach(id=>deletedAccountTombstones.add(id));
+  currentChildren=currentChildren.filter(
+    child=>!deletedAccountTombstones.has(String(child.user_id))
+  );
+
+  // 立即只在本機移除已確認不存在的帳號，避免等待舊列表快照。
+  closeAllPanels();
+  renderChildren();
+  managementSyncSignature=managementSnapshot(contextStack.at(-1),currentChildren);
+
+  // 再用既有 loadContext 做一次正常資料對齊；tombstone 會避免舊快照把帳號畫回來。
+  await loadContext(false).catch(()=>{});
+}
+
+function startDeletionWatch(){
+  stopDeletionWatch();
+  deletionWatch=setInterval(()=>{
+    checkPermanentDeletionNow().catch(()=>{});
+  },1200);
+}
 
 async function loadContext(closePanels=true){
   if(closePanels)closeAllPanels();
@@ -2038,7 +2027,7 @@ async function loadDashboard(){
   document.getElementById("currentRole").textContent="｜"+(currentSelf.role_name||ROLE_LABEL[currentSelf.business_role]||"");
   document.getElementById("currentStatus").textContent=currentSelf.is_enabled?"啟用中":"🚫 已停用";
   document.getElementById("myNameBtn").style.display=currentSelf.is_platform_owner?"inline-flex":"none";
-  const root=await rootContext();contextStack=[root];showOnly("dashboard");startSessionWatch();await loadContext();startManagementSyncWatch();
+  const root=await rootContext();contextStack=[root];showOnly("dashboard");startSessionWatch();await loadContext();startManagementSyncWatch();startDeletionWatch();
 }
 async function login(){
   const account=loginEmail(document.getElementById("loginAccount").value),password=document.getElementById("loginPassword").value,status=document.getElementById("loginStatus");status.style.display="none";
@@ -2341,6 +2330,7 @@ document.getElementById("loginBtn").addEventListener("click",login);
 document.getElementById("loginPassword").addEventListener("keydown",e=>{if(e.key==="Enter")login()});
 document.getElementById("claimBtn").addEventListener("click",claimPassword);
 document.getElementById("logoutBtn").addEventListener("click",async()=>{
+  stopDeletionWatch();
   stopManagementSyncWatch();
   if(sessionWatch)clearInterval(sessionWatch);
   try{await supabaseClient.auth.signOut({scope:"global"})}catch{}
