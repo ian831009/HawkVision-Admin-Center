@@ -496,7 +496,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.4</div>
+  <div class="version">Admin Center v2.3.5</div>
 </header>
 
 <main>
@@ -1804,7 +1804,7 @@ function auditDetailText(item){
     case "QUOTA_RECLAIM": return `異動：收回 ${fmt(n.amount||0)} 額度\n原本額度：${fmt(o.quota_before||0)}\n異動後：${fmt(n.quota_after||0)}${item.reason?`\n備註：${item.reason}`:""}`;
     case "DISPLAY_NAME_UPDATE": return `原本名稱：${o.target_display_name||"—"}\n修改後名稱：${n.target_display_name||"—"}`;
     case "COADMIN_PLATFORM_QUOTA_PERMISSION": return `平台額度權限：${boolLabel(n.can_use_platform_quota)}`;
-    case "ACCOUNT_CREATE": return `建立帳號：${n.target_display_name||n.target_account||"—"}\n角色：${n.business_role||"—"}${n.initial_quota!=null?`\n初始額度：${fmt(n.initial_quota)}`:""}`;
+    case "ACCOUNT_CREATE": return `建立帳號：${n.target_display_name||n.target_account||"—"}\n角色：${ROLE_LABEL[n.business_role]||n.business_role||"—"}${n.initial_quota!=null?`\n初始額度：${fmt(n.initial_quota)}`:""}`;
     case "ACCOUNT_DELETE": case "TAKEOVER_AND_DELETE_ACCOUNT": return `刪除帳號：${o.target_display_name||o.target_account||"—"}${Number(n.transferred_direct_children||0)>0?`\n接手直屬下屬：${n.transferred_direct_children} 個`:""}`;
     default:return auditSummary(item)||"此異動沒有其他詳細內容";
   }
