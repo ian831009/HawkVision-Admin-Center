@@ -503,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.21</div>
+  <div class="version">Admin Center v2.3.22</div>
 </header>
 
 <main>
@@ -1372,7 +1372,7 @@ async function renderManager(manager,child,row){
     <div class="manager-menu">
       ${noQuota?"":'<button class="soft quota-menu" type="button">額度管理</button>'}
       ${showPermissionMenu?'<button class="soft-violet permission-menu" type="button">權限管理</button>':""}
-      ${detail.business_role==="member"?'<button class="soft-amber hours-menu" type="button">時數管理</button>':'<button class="soft-amber contract-menu" type="button">合約時間</button>'}
+      ${detail.business_role==="member"?'<button class="soft-violet member-mode-menu" type="button">模式權限</button><button class="soft-amber hours-menu" type="button">時數管理</button>':'<button class="soft-amber contract-menu" type="button">合約時間</button>'}
       ${detail.can_rename?'<button class="soft-cyan name-menu" type="button">修改名稱</button>':""}
       ${detail.can_reset_password?'<button class="soft password-menu" type="button">修改密碼</button>':""}
     </div>
@@ -1621,6 +1621,44 @@ async function renderManager(manager,child,row){
     }catch(e){host.innerHTML='<div class="subpanel"><div class="local-status status"></div></div>';localStatus(host,e.message||e,"error")}
   });
 
+  manager.querySelector(".member-mode-menu")?.addEventListener("click",async()=>{
+    host.innerHTML=`<div class="subpanel"><h4>會員分析模式權限</h4><div class="hint">此權限只適用於會員。會員以外管理層只要有分析引擎權限，即可使用全部分析模式。</div><div class="local-status status" style="display:block">正在載入模式權限…</div></div>`;
+    try{
+      const {data,error}=await supabaseClient.rpc("hv_admin_member_analysis_modes_v1",{p_target_user_id:detail.user_id});
+      if(error)throw error;
+      const d=data||{};
+      if(d.can_manage!==true){
+        host.innerHTML=`<div class="subpanel"><h4>會員分析模式權限</h4><div class="status error" style="display:block">${escapeHtml(d.reason||"目前只能查看，無法變更此會員的模式權限")}</div></div>`;
+        return;
+      }
+      host.innerHTML=`<div class="subpanel"><h4>會員分析模式權限</h4>
+        <div class="hint">只影響會員登入分析引擎後可選擇的模式。基礎模式為保底模式；即使會員跳過模式選擇，系統仍使用基礎分析。</div>
+        <div class="permission-list" style="margin-top:12px">
+          <label class="permission-item"><span><strong>基礎模式</strong><small>基本歷史序列分析</small></span><input class="member-mode-basic" type="checkbox" checked disabled></label>
+          <label class="permission-item"><span><strong>算牌模式</strong><small>依已鎖定算牌規則使用</small></span><input class="member-mode-counting" type="checkbox" ${d.counting_enabled===true?"checked":""}></label>
+          <label class="permission-item"><span><strong>完整模式</strong><small>完整牌局進階分析（正式規則完成後接入）</small></span><input class="member-mode-full" type="checkbox" ${d.full_enabled===true?"checked":""}></label>
+        </div>
+        <div class="local-status status"></div>
+        <div class="panel-actions"><button class="primary save-member-modes" type="button">儲存模式權限</button></div>
+      </div>`;
+      host.querySelector(".save-member-modes")?.addEventListener("click",async()=>{
+        const btn=host.querySelector(".save-member-modes");btn.disabled=true;
+        try{
+          const {data:result,error:saveError}=await supabaseClient.rpc("hv_set_member_analysis_modes_v1",{
+            p_target_user_id:detail.user_id,
+            p_basic_enabled:host.querySelector(".member-mode-basic").checked,
+            p_counting_enabled:host.querySelector(".member-mode-counting").checked,
+            p_full_enabled:host.querySelector(".member-mode-full").checked
+          });
+          if(saveError)throw saveError;
+          localStatus(host,"✓ 會員分析模式權限已更新","success");
+          await announceManagementChange("member-analysis-modes",detail.user_id);
+        }catch(e){localStatus(host,translateError(e.message||String(e)));}
+        finally{btn.disabled=false;}
+      });
+    }catch(e){host.innerHTML=`<div class="subpanel"><h4>會員分析模式權限</h4><div class="status error" style="display:block">${escapeHtml(translateError(e.message||String(e)))}</div></div>`;}
+  });
+
   manager.querySelector(".hours-menu")?.addEventListener("click",async()=>{
     const renderHours=async()=>{
       host.innerHTML='<div class="subpanel"><div class="empty">載入中…</div></div>';
@@ -1628,6 +1666,8 @@ async function renderManager(manager,child,row){
         const {data,error}=await supabaseClient.rpc("hv_admin_member_hour_packages_v1",{p_target_user_id:detail.user_id});
         if(error)throw error;
         const d=data||{}, batches=Array.isArray(d.batches)?d.batches:[];
+        // v2.3.22 additive mirror: keep the new analysis runtime hour inventory aligned without changing existing hour logic.
+        supabaseClient.rpc("hv_analysis_sync_hour_inventory_v1",{p_target_user_id:detail.user_id,p_inventory:d}).then(()=>{},()=>{});
         host.innerHTML=`<div class="subpanel">
           <div class="quota-summary">
             <div class="summary-box"><div class="small">未啟用時數包</div><div class="big">${fmt(d.available_packages||0)} 包</div></div>
@@ -1655,6 +1695,7 @@ async function renderManager(manager,child,row){
           try{
             const {error}=await supabaseClient.rpc("hv_grant_member_hour_packages_v1",{p_target_user_id:detail.user_id,p_hours_per_package:h,p_package_count:c});
             if(error)throw error;
+            supabaseClient.rpc("hv_analysis_mirror_hour_grant_v1",{p_target_user_id:detail.user_id,p_hours_per_package:h,p_package_count:c}).then(()=>{},()=>{});
             await announceManagementChange("member-hours-grant",detail.user_id);
             await renderHours(); localStatus(host,`✓ 已給予 ${h} 小時 × ${c} 包`,"success");
           }catch(e){localStatus(host,e.message||e,"error")}
@@ -1666,6 +1707,8 @@ async function renderManager(manager,child,row){
           try{
             const {error}=await supabaseClient.rpc("hv_clear_member_hours_v1",{p_target_user_id:detail.user_id});
             if(error)throw error;
+            const {error:analysisClearError}=await supabaseClient.rpc("hv_analysis_clear_member_hours_v1",{p_target_user_id:detail.user_id});
+            if(analysisClearError)console.warn("analysis hour mirror clear failed",analysisClearError);
             await renderHours();
             localStatus(host,"✓ 會員時數資料已清空，可重新交給新的使用者","success");
           }catch(e){localStatus(host,e.message||e,"error")}
@@ -1686,6 +1729,7 @@ async function renderManager(manager,child,row){
               try{
                 const {error}=await supabaseClient.rpc("hv_reclaim_member_hour_packages_v1",{p_batch_id:batchId,p_package_count:c});
                 if(error)throw error;
+                supabaseClient.rpc("hv_analysis_mirror_hour_reclaim_v1",{p_target_user_id:detail.user_id,p_hours_per_package:hours,p_package_count:c}).then(()=>{},()=>{});
                 await announceManagementChange("member-hours-reclaim",detail.user_id);
                 await renderHours();localStatus(host,`✓ 已收回 ${hours} 小時 × ${c} 包`,"success");
               }catch(e){localStatus(box,e.message||e,"error")}
@@ -2517,6 +2561,7 @@ const AUDIT_LABELS={
   MEMBER_HOUR_PACKAGE_RECLAIM:"收回會員時數包",
   MEMBER_HOUR_PACKAGE_ACTIVATE:"啟用會員時數包",
   MEMBER_HOURS_RESET:"清空會員時數資料",
+  MEMBER_ANALYSIS_MODES_UPDATE:"會員分析模式權限",
   TAKEOVER_AND_DELETE_ACCOUNT:"刪除並接手下屬",
   TAKEOVER_DIRECT_CHILDREN_V2:"接手直屬下屬",
   ENABLE_DIRECT_ACCOUNT:"啟用帳號",
@@ -2566,6 +2611,7 @@ function auditSummary(item){
     case "MEMBER_HOUR_PACKAGE_RECLAIM": return `收回 ${fmt(n.hours_per_package||0)} 小時 × ${fmt(n.package_count||0)} 包`;
     case "MEMBER_HOUR_PACKAGE_ACTIVATE": return `啟用 ${fmt(n.hours_per_package||0)} 小時時數包`;
     case "MEMBER_HOURS_RESET": return "清空會員時數資料";
+    case "MEMBER_ANALYSIS_MODES_UPDATE": return "變更會員分析模式權限";
     case "COADMIN_PLATFORM_QUOTA_PERMISSION": return `共同管理員平台額度權限：${boolLabel(n.can_use_platform_quota)}`;
     case "ACCOUNT_CREATE": return `建立帳號：${n.target_display_name||n.target_account||"—"}`;
     case "ACCOUNT_DELETE":
@@ -2850,6 +2896,20 @@ async function restore(){
   currentUser=session.user;
   try{await loadDashboard()}
   catch(e){await supabaseClient.auth.signOut({scope:"local"}).catch(()=>{});window.location.replace("https://hawkvisionai.com/")}
+})();
+</script>
+
+<script>
+/* HV_SINGLE_DEVICE_GUARD_V1 — additive; does not change existing Admin Center business logic. */
+(()=>{
+  const COOKIE="hv-device-token";let currentUid="",baselinePw=null,busy=false;
+  const getCookie=()=>{const p=COOKIE+"=";const r=document.cookie.split("; ").find(v=>v.startsWith(p));return r?decodeURIComponent(r.slice(p.length)):""};
+  const setCookie=v=>document.cookie=`${COOKIE}=${encodeURIComponent(v)}; Domain=.hawkvisionai.com; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
+  const deviceToken=()=>{let v=getCookie();if(!v){v=crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;setCookie(v)}return v};
+  async function rpc(name,args={}){const {data,error}=await supabaseClient.rpc(name,args);if(error)throw error;return data}
+  async function forceOut(reason){try{await supabaseClient.auth.signOut({scope:"local"})}catch{};const q=reason==="password_reset"?"password_reset=1":"session_replaced=1";location.replace(`https://hawkvisionai.com/?${q}`)}
+  async function check(){if(busy)return;busy=true;try{const {data:{session}}=await supabaseClient.auth.getSession();if(!session?.user){currentUid="";baselinePw=null;return}const uid=session.user.id,t=deviceToken();if(uid!==currentUid){currentUid=uid;await rpc("hv_claim_single_device_v1",{p_device_token:t,p_client_name:"admin"});const d=await rpc("hv_analysis_live_status_v1",{p_device_token:t});baselinePw=Number(d?.password_generation||0);return}const d=await rpc("hv_analysis_live_status_v1",{p_device_token:t});if(d?.device_valid===false){await forceOut("device");return}const pw=Number(d?.password_generation||0);if(baselinePw!=null&&pw>baselinePw){sessionStorage.setItem("hv-force-login-message","上層已重置密碼，請聯繫上層");await forceOut("password_reset");return}}catch(e){console.warn("single-device guard",e)}finally{busy=false}}
+  setInterval(check,1500);setTimeout(check,300);
 })();
 </script>
 </body>
