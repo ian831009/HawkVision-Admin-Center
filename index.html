@@ -503,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.26</div>
+  <div class="version">Admin Center v2.3.27</div>
 </header>
 
 <main>
@@ -1618,7 +1618,7 @@ async function renderManager(manager,child,row){
           try{applyEffectiveStatusToRow(row,child,await getEffectiveStatus(detail.user_id))}catch(_){}
         }catch(e){localStatus(host,e.message||e,"error")}
       });
-    }catch(e){host.innerHTML='<div class="subpanel"><div class="local-status status"></div></div>';localStatus(host,e.message||e,"error")}
+    }catch(e){host.innerHTML='<div class="subpanel"><div class="local-status status"></div></div>';localStatus(host,translateError(e.message||String(e)),"error")}
   });
 
   manager.querySelector(".member-mode-menu")?.addEventListener("click",async()=>{
@@ -1664,7 +1664,7 @@ async function renderManager(manager,child,row){
         const {data,error}=await supabaseClient.rpc("hv_admin_member_hour_packages_v1",{p_target_user_id:detail.user_id});
         if(error)throw error;
         const d=data||{};
-        // v2.3.26: 管理端「可收回」必須以分析引擎同一份未使用庫存為準。
+        // v2.3.27: 管理端「可收回」必須以分析引擎同一份未使用庫存為準。
         // 不再於開啟管理頁時用舊管理資料反向覆蓋分析庫存，避免會員已開啟的包重新出現。
         let analysisHours=null;
         try{const r=await supabaseClient.rpc("hv_analysis_admin_hour_inventory_v1",{p_target_user_id:detail.user_id});if(!r.error)analysisHours=r.data}catch(_e){}
@@ -1686,12 +1686,12 @@ async function renderManager(manager,child,row){
             <button class="danger-soft clear-hours-btn" type="button">清空時數資料</button>
           </div>`:""}
           <div class="local-status status"></div>
-          <div style="margin-top:14px">${batches.map(b=>`<div class="product-row">
-            <div><strong>${fmt(b.hours_per_package)} 小時 × ${fmt(b.original_count)} 包</strong>
-              <div class="hint">未啟用 ${fmt(b.available_count)}｜已啟用 ${fmt(b.activated_count)}｜已收回 ${fmt(b.reclaimed_count)}｜${escapeHtml(formatAuditTime(b.created_at))}</div>
+          <div style="margin-top:14px">${batches.filter(b=>Number(b.available_count)>0).map(b=>`<div class="product-row">
+            <div><strong>${fmt(b.hours_per_package)} 小時 × ${fmt(b.available_count)} 包</strong>
+              <div class="hint">目前尚未開啟，可由管理者收回</div>
             </div>
-            ${b.can_reclaim&&Number(b.available_count)>0?`<button class="danger-soft reclaim-hours-btn" data-id="${escapeHtml(b.batch_id)}" data-max="${fmt(b.available_count)}" data-hours="${fmt(b.hours_per_package)}" type="button">收回</button>`:""}
-          </div>`).join("")||'<div class="empty">目前沒有時數包</div>'}</div>
+            ${b.can_reclaim?`<button class="danger-soft reclaim-hours-btn" data-id="${escapeHtml(b.batch_id)}" data-max="${fmt(b.available_count)}" data-hours="${fmt(b.hours_per_package)}" type="button">收回</button>`:""}
+          </div>`).join("")||'<div class="empty">目前沒有可收回的時數包</div>'}</div>
         </div>`;
 
         host.querySelector(".grant-hours-btn")?.addEventListener("click",async()=>{
@@ -1737,11 +1737,11 @@ async function renderManager(manager,child,row){
                 supabaseClient.rpc("hv_analysis_mirror_hour_reclaim_v1",{p_target_user_id:detail.user_id,p_hours_per_package:hours,p_package_count:c}).then(()=>{},()=>{});
                 await announceManagementChange("member-hours-reclaim",detail.user_id);
                 await renderHours();localStatus(host,`✓ 已收回 ${hours} 小時 × ${c} 包`,"success");
-              }catch(e){localStatus(box,e.message||e,"error")}
+              }catch(e){localStatus(box,translateError(e.message||String(e)),"error")}
             };
           });
         }
-      }catch(e){host.innerHTML='<div class="subpanel"><div class="local-status status"></div></div>';localStatus(host,e.message||e,"error")}
+      }catch(e){host.innerHTML='<div class="subpanel"><div class="local-status status"></div></div>';localStatus(host,translateError(e.message||String(e)),"error")}
     };
     await renderHours();
   });
