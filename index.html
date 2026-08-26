@@ -503,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.25</div>
+  <div class="version">Admin Center v2.3.26</div>
 </header>
 
 <main>
@@ -1663,13 +1663,20 @@ async function renderManager(manager,child,row){
       try{
         const {data,error}=await supabaseClient.rpc("hv_admin_member_hour_packages_v1",{p_target_user_id:detail.user_id});
         if(error)throw error;
-        const d=data||{}, batches=Array.isArray(d.batches)?d.batches:[];
-        // v2.3.22 additive mirror: keep the new analysis runtime hour inventory aligned without changing existing hour logic.
-        supabaseClient.rpc("hv_analysis_sync_hour_inventory_v1",{p_target_user_id:detail.user_id,p_inventory:d}).then(()=>{},()=>{});
+        const d=data||{};
+        // v2.3.26: 管理端「可收回」必須以分析引擎同一份未使用庫存為準。
+        // 不再於開啟管理頁時用舊管理資料反向覆蓋分析庫存，避免會員已開啟的包重新出現。
+        let analysisHours=null;
+        try{const r=await supabaseClient.rpc("hv_analysis_admin_hour_inventory_v1",{p_target_user_id:detail.user_id});if(!r.error)analysisHours=r.data}catch(_e){}
+        const pools=new Map((Array.isArray(analysisHours?.available)?analysisHours.available:[]).map(x=>[Number(x.hours_per_package),Number(x.available_count||0)]));
+        const rawBatches=Array.isArray(d.batches)?d.batches:[];
+        const batches=rawBatches.map(b=>{const h=Number(b.hours_per_package),legacy=Math.max(0,Number(b.available_count||0)),pool=Math.max(0,Number(pools.get(h)||0)),effective=Math.min(legacy,pool);pools.set(h,Math.max(0,pool-effective));return {...b,available_count:effective,activated_count:Math.max(Number(b.activated_count||0),Number(b.original_count||0)-effective-Number(b.reclaimed_count||0))}});
+        const availablePackages=Array.from((Array.isArray(analysisHours?.available)?analysisHours.available:[])).reduce((n,x)=>n+Number(x.available_count||0),0);
+        const runtimeSeconds=Number(analysisHours?.remaining_seconds||0);const runtimeText=`${String(Math.floor(runtimeSeconds/3600)).padStart(2,"0")}:${String(Math.floor((runtimeSeconds%3600)/60)).padStart(2,"0")}:${String(runtimeSeconds%60).padStart(2,"0")}`;
         host.innerHTML=`<div class="subpanel">
           <div class="quota-summary">
-            <div class="summary-box"><div class="small">未啟用時數包</div><div class="big">${fmt(d.available_packages||0)} 包</div></div>
-            <div class="summary-box"><div class="small">目前倒數剩餘</div><div class="big">${escapeHtml(d.active_remaining_text||"00:00:00")}</div></div>
+            <div class="summary-box"><div class="small">剩餘可收回時數包</div><div class="big">${fmt(analysisHours?availablePackages:(d.available_packages||0))} 包</div></div>
+            <div class="summary-box"><div class="small">目前倒數剩餘</div><div class="big">${escapeHtml(analysisHours?runtimeText:(d.active_remaining_text||"00:00:00"))}</div></div>
           </div>
           ${d.can_grant?`<div class="grid">
             <div><label>每包時數（小時）</label><input class="grant-hours" type="number" min="1" max="999" step="1"></div>
