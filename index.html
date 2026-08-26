@@ -503,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.23</div>
+  <div class="version">Admin Center v2.3.24</div>
 </header>
 
 <main>
@@ -1627,19 +1627,17 @@ async function renderManager(manager,child,row){
       const {data,error}=await supabaseClient.rpc("hv_admin_member_analysis_modes_v1",{p_target_user_id:detail.user_id});
       if(error)throw error;
       const d=data||{};
-      if(d.can_manage!==true){
-        host.innerHTML=`<div class="subpanel"><h4>會員分析模式權限</h4><div class="status error" style="display:block">${escapeHtml(d.reason||"目前只能查看，無法變更此會員的模式權限")}</div></div>`;
-        return;
-      }
+      const canManage=d.can_manage===true;
       host.innerHTML=`<div class="subpanel"><h4>會員分析模式權限</h4>
         <div class="hint">只影響會員登入分析引擎後可選擇的模式。基礎模式為保底模式；即使會員跳過模式選擇，系統仍使用基礎分析。</div>
+        ${canManage?"":`<div class="readonly-note" style="margin-top:10px">目前為查看模式：此會員已由其他直屬上層接手，你可以查看目前模式權限，但不能變更。</div>`}
         <div class="permission-list" style="margin-top:12px">
           <label class="permission-item"><span><strong>基礎模式</strong><small>基本歷史序列分析</small></span><input class="member-mode-basic" type="checkbox" checked disabled></label>
-          <label class="permission-item"><span><strong>算牌模式</strong><small>依已鎖定算牌規則使用</small></span><input class="member-mode-counting" type="checkbox" ${d.counting_enabled===true?"checked":""}></label>
-          <label class="permission-item"><span><strong>完整模式</strong><small>完整牌局進階分析（正式規則完成後接入）</small></span><input class="member-mode-full" type="checkbox" ${d.full_enabled===true?"checked":""}></label>
+          <label class="permission-item"><span><strong>算牌模式</strong><small>依已鎖定算牌規則使用</small></span><input class="member-mode-counting" type="checkbox" ${d.counting_enabled===true?"checked":""} ${canManage?"":"disabled"}></label>
+          <label class="permission-item"><span><strong>完整模式</strong><small>完整牌局進階分析（正式規則完成後接入）</small></span><input class="member-mode-full" type="checkbox" ${d.full_enabled===true?"checked":""} ${canManage?"":"disabled"}></label>
         </div>
         <div class="local-status status"></div>
-        <div class="panel-actions"><button class="primary save-member-modes" type="button">儲存模式權限</button></div>
+        ${canManage?'<div class="panel-actions"><button class="primary save-member-modes" type="button">儲存模式權限</button></div>':''}
       </div>`;
       host.querySelector(".save-member-modes")?.addEventListener("click",async()=>{
         const btn=host.querySelector(".save-member-modes");btn.disabled=true;
