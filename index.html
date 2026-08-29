@@ -503,7 +503,7 @@ body{
 <body>
 <header>
   <div><h1>HawkVision 管理中心</h1><p>帳號、層級、額度與管理權限</p></div>
-  <div class="version">Admin Center v2.3.28</div>
+  <div class="version">Admin Center v2.3.29</div>
 </header>
 
 <main>
@@ -1745,10 +1745,32 @@ async function renderManager(manager,child,row){
     };
     await renderHours();
     if(host._hoursSyncTimer)clearInterval(host._hoursSyncTimer);
+    // v2.3.29: background inventory sync must never re-render the active hours UI.
+    // It only patches visible inventory numbers when the user is idle; active reclaim/grant flows are never interrupted.
+    let hoursSyncBusy=false;
     host._hoursSyncTimer=setInterval(async()=>{
       if(!host.querySelector("[data-hours-live-sync]")){clearInterval(host._hoursSyncTimer);host._hoursSyncTimer=null;return}
-      if(host.querySelector("input:focus"))return;
-      await renderHours();
+      if(hoursSyncBusy)return;
+      if(host.querySelector("input:focus,.reclaim-count,.confirm-reclaim-step1,.cancel-reclaim"))return;
+      hoursSyncBusy=true;
+      try{
+        const r=await supabaseClient.rpc("hv_analysis_admin_hour_inventory_v1",{p_target_user_id:detail.user_id});
+        if(r.error)return;
+        const latest=Array.isArray(r.data)?r.data:[];
+        const byId=new Map(latest.map(x=>[String(x.batch_id),x]));
+        for(const btn of host.querySelectorAll(".reclaim-hours-btn")){
+          const item=byId.get(String(btn.dataset.id));
+          if(!item)continue;
+          const next=Math.max(0,Number(item.available_count||0));
+          const prev=Math.max(0,Number(btn.dataset.max||0));
+          if(next===prev)continue;
+          btn.dataset.max=String(next);
+          const row=btn.closest(".product-row");
+          const strong=row?.querySelector("strong");
+          if(strong)strong.textContent=`${fmt(item.hours_per_package)} 小時 × ${fmt(next)} 包`;
+          if(next<=0){row?.remove();}
+        }
+      }catch(_e){}finally{hoursSyncBusy=false}
     },4000);
   });
 
