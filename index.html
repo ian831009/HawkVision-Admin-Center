@@ -997,7 +997,7 @@ function startAccessRecoveryWatch(){
         status.style.display="block";
       }
     }
-  },1500);
+  },30000);
 }
 
 function handleProductAccessRevoked(){
@@ -1060,7 +1060,7 @@ function startSessionWatch(){
     if(!accessError&&hasAdminAccess!==true){
       handleProductAccessRevoked();
     }
-  },1500);
+  },30000);
 }
 
 async function selfDetail(){
@@ -2272,7 +2272,7 @@ function startManagementSyncWatch(){
   stopManagementSyncWatch();
   managementSyncWatch=setInterval(()=>{
     syncManagementViewNow(false).catch(()=>{});
-  },1500);
+  },30000);
 }
 
 
@@ -2362,7 +2362,7 @@ function startDeletionWatch(){
   stopDeletionWatch();
   deletionWatch=setInterval(()=>{
     checkPermanentDeletionNow().catch(()=>{});
-  },1200);
+  },30000);
 }
 
 async function loadContext(closePanels=true){
@@ -2956,7 +2956,7 @@ async function restore(){
   async function rpc(name,args={}){const {data,error}=await supabaseClient.rpc(name,args);if(error)throw error;return data}
   async function forceOut(reason){try{await supabaseClient.auth.signOut({scope:"local"})}catch{};const q=reason==="password_reset"?"password_reset=1":"session_replaced=1";location.replace(`https://hawkvisionai.com/?${q}`)}
   async function check(){if(busy)return;busy=true;try{const {data:{session}}=await supabaseClient.auth.getSession();if(!session?.user){currentUid="";baselinePw=null;return}const uid=session.user.id,t=deviceToken();if(uid!==currentUid){currentUid=uid;await rpc("hv_claim_single_device_v1",{p_device_token:t,p_client_name:"admin"});const d=await rpc("hv_analysis_live_status_v1",{p_device_token:t});baselinePw=Number(d?.password_generation||0);return}const d=await rpc("hv_analysis_live_status_v1",{p_device_token:t});if(d?.device_valid===false){await forceOut("device");return}const pw=Number(d?.password_generation||0);if(baselinePw!=null&&pw>baselinePw){sessionStorage.setItem("hv-force-login-message","上層已重置密碼，請聯繫上層");await forceOut("password_reset");return}}catch(e){console.warn("single-device guard",e)}finally{busy=false}}
-  setInterval(check,1500);setTimeout(check,300);
+  setInterval(check,15000);setTimeout(check,300);
 })();
 </script>
 </body>
